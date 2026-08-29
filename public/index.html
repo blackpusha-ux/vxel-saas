@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="VXEL Studio Pro : Optimisation de nesting et préparation de fichiers pour l'impression DTF.">
+    <meta name="theme-color" content="#0A0A0A">
+    <title>VXEL — DTF Studio Pro</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    
+    <!-- Note : Pour ce test interne, le CDN est conservé. Pour la production, migrez vers un build npm. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Dancing+Script:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --tb-orange: #F7941D; --tb-orange-light: #FFB25A; --tb-orange-pale: #FFD9A8;
+            --tb-black: #0A0A0A; --tb-panel: #161616; --tb-panel2: #1F1F1F;
+            --tb-border: #2E2E2E; --tb-text: #F0F0F0; --tb-muted: #9C9C9C;
+        }
+        /* Correction responsive : utilisation de dvh pour éviter les bugs de barre d'adresse mobile */
+        html, body { min-height: 100dvh; margin: 0; overflow-x: hidden; }
+        body { font-family: 'Nunito', sans-serif; background: var(--tb-black); color: var(--tb-text); }
+        h1, h2, h3 { font-family: 'Baloo 2', cursive; }
+        .tb-slogan { font-family: 'Dancing Script', cursive; color: var(--tb-orange); }
+        
+        input[type=range] { accent-color: var(--tb-orange); height: 16px; }
+        input[type=checkbox] { accent-color: var(--tb-orange); }
+        
+        .tb-btn-primary { background: var(--tb-orange); color: #0A0A0A; font-weight: 800; transition: background 0.2s; }
+        .tb-btn-primary:hover { background: var(--tb-orange-light); }
+        .tb-btn-primary:disabled { background: #333; color: #777; cursor: not-allowed; }
+        
+        .tb-btn-secondary { background: var(--tb-panel2); color: #fff; border: 1px solid var(--tb-border); font-weight: 700; transition: all 0.2s; }
+        .tb-btn-secondary:hover { border-color: var(--tb-orange); color: var(--tb-orange-light); }
+        
+        .tb-input { background: var(--tb-black); border: 1px solid var(--tb-border); color: var(--tb-text); font-size: 11px; transition: border-color 0.2s; }
+        .tb-input:focus { outline: none; border-color: var(--tb-orange); }
+        
+        input[type=file] { font-size: 11px; }
+        input[type=file]::file-selector-button { background: var(--tb-orange); color: #0A0A0A; font-weight: 800; border: none;
+            padding: 6px 12px; border-radius: 6px; margin-right: 8px; cursor: pointer; font-size: 11px; transition: background 0.2s; }
+        input[type=file]::file-selector-button:hover { background: var(--tb-orange-light); }
+        
+        .tb-badge { background: rgba(10,10,10,.9); border: 1px solid var(--tb-orange); color: var(--tb-orange-pale); font-size: 10px; }
+        
+        .fabric-swatch { border: 2px solid var(--tb-border); transition: all 0.2s; }
+        .fabric-swatch.active-swatch { border-color: var(--tb-orange) !important; box-shadow: 0 0 0 2px rgba(247,148,29,.5); }
+        .fabric-swatch:hover { transform: scale(1.1); }
+        
+        ::-webkit-scrollbar { width: 6px; } 
+        ::-webkit-scrollbar-track { background: var(--tb-panel); }
+        ::-webkit-scrollbar-thumb { background: var(--tb-border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--tb-orange); }
+        
+        .section { background: var(--tb-panel); border: 1px solid var(--tb-border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+        .section h3 { font-size: 11px; font-weight: 800; color: var(--tb-orange); text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--tb-border); }
+            
+        .ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; }
+        .ctrl-row label { flex: 0 0 80px; color: var(--tb-muted); font-size: 11px; cursor: pointer; }
+        .ctrl-row input[type=range] { flex: 1; }
+        .ctrl-row .val { flex: 0 0 36px; text-align: right; color: var(--tb-orange); font-weight: 700; font-size: 11px; }
+        .ctrl-row select { flex: 1; padding: 3px 5px; }
+        
+        .swatch-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .swatch-grid .fabric-swatch { width: 100%; aspect-ratio: 1; border-radius: 4px; cursor: pointer; }
+        
+        /* Correction du scroll pour mobile et desktop */
+        .ctrl-column { overflow-y: auto; max-height: calc(100dvh - 120px); padding-right: 4px; }
+    </style>
+</head>
+<body class="flex flex-col p-3 gap-3">
+
+    <!-- OVERLAY DE CHARGEMENT (Ajouté pour l'UX) -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 z-[400] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#F7941D]"></div>
+        <p class="text-[#F7941D] mt-4 font-bold text-sm">Traitement en cours...</p>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="fixed top-4 right-4 bg-[#161616] border border-[#F7941D] text-[#FFD9A8] px-3 py-1.5 rounded-lg shadow-2xl z-[500] hidden text-xs font-semibold" id="toast"></div>
+
+    <!-- MODAL PACKS -->
+    <div id="packModal" class="hidden fixed inset-0 z-[300] bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-[#161616] border border-[#F7941D] rounded-xl p-5 w-full max-w-md">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-base font-extrabold text-white">💰 Packs de crédits</h2>
+                <button id="closePackModal" class="tb-btn-secondary px-2 py-1 rounded text-xs" aria-label="Fermer la fenêtre des packs">✖</button>
+            </div>
+            <p class="text-xs text-gray-400 mb-3 text-center">1 crédit = 1 fichier DTF traité et optimisé.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="border border-[#2E2E2E] rounded-lg p-3 flex flex-col items-center gap-1 hover:border-[#F7941D] transition-colors">
+                    <span class="text-2xl">🎁</span>
+                    <span class="text-sm font-extrabold text-white">50 crédits</span>
+                    <span class="text-[#F7941D] font-extrabold text-lg">25 TND</span>
+                    <button onclick="buyPack(50)" class="tb-btn-primary w-full py-1.5 rounded-md text-xs mt-1">Choisir</button>
+                </div>
+                <div class="border border-[#F7941D] rounded-lg p-3 flex flex-col items-center gap-1 bg-[#2a1a05] relative">
+                    <span class="absolute -top-2 -right-2 bg-[#F7941D] text-black text-[9px] font-bold px-2 py-0.5 rounded-full">POPULAIRE</span>
+                    <span class="text-2xl">👑</span>
+                    <span class="text-sm font-extrabold text-white">200 crédits</span>
+                    <span class="text-[#F7941D] font-extrabold text-lg">80 TND</span>
+                    <span class="text-[10px] text-green-400 font-bold">Soit 0,40 TND/crédit (Économisez 20%)</span>
+                    <button onclick="buyPack(200)" class="tb-btn-primary w-full py-1.5 rounded-md text-xs mt-1">Choisir</button>
+                </div>
+            </div>
+            <p class="text-[9px] text-[#9C9C9C] mt-3 leading-tight text-center">⚠️ Mode TEST : le paiement est simulé pour l'instant.</p>
+        </div>
+    </div>
+
+    <!-- BARRE CONNEXION -->
+    <div id="authBar" class="bg-[#161616] border border-[#F7941D] rounded-lg px-4 py-2 flex flex-col sm:flex-row items-center gap-3">
+        <div id="loginForm" class="flex flex-col sm:flex-row items-center gap-2 flex-1 w-full">
+            <span class="text-xs font-bold text-[#FFB25A] whitespace-nowrap">🔐 Ton email :</span>
+            <input type="email" id="emailInput" placeholder="ton@email.com" class="tb-input rounded px-3 py-1.5 flex-1 w-full sm:max-w-[260px]">
+            <button id="loginBtn" class="tb-btn-primary px-4 py-1.5 rounded-md text-xs w-full sm:w-auto">Connexion / Inscription</button>
+        </div>
+        <div id="creditDisplay" class="hidden flex flex-col sm:flex-row items-center gap-3 flex-1 w-full justify-between sm:justify-end">
+            <span class="text-xs font-bold text-white whitespace-nowrap">👤 <span id="userEmail"></span></span>
+            <div class="flex items-center gap-2">
+                <span class="tb-badge px-3 py-1 rounded-lg text-sm font-extrabold"> <span id="creditCount">0</span> crédits</span>
+                <button id="buyBtn" class="tb-btn-primary px-3 py-1 rounded-md text-[10px]">➕ Acheter</button>
+                <button id="logoutBtn" class="tb-btn-secondary px-3 py-1 rounded-md text-[10px]">Déconnexion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-[#161616] border border-[#2E2E2E] rounded-lg px-4 py-2 gap-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+            <div class="flex items-center gap-2">
+                <img src="logo.png" alt="VXEL Logo" class="h-8">
+                <h1 class="text-base font-extrabold text-white leading-none">VXEL <span class="text-[#F7941D]">DTF Studio Pro</span></h1>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <label for="imageLoader" class="tb-btn-secondary px-3 py-1.5 rounded-md text-xs cursor-pointer flex items-center gap-2 w-full sm:w-auto justify-center">
+                    📁 Charger une image
+                </label>
+                <input type="file" id="imageLoader" accept="image/*" class="hidden">
+            </div>
+        </div>
+        <div class="flex items-center gap-2 text-[10px] text-[#9C9C9C]">
+            <span class="font-bold text-[#FFB25A]">v1.0 Beta</span><span>· www.vxel.tn</span>
+        </div>
+    </header>
+
+    <!-- GRILLE PRINCIPALE (Responsive : empilée sur mobile, 3 colonnes sur grand écran) -->
+    <div class="flex-1 grid grid-cols-12 gap-3 min-h-0">
+
+        <!-- COLONNE 1 : PREVISUALISATION -->
+        <div class="col-span-12 lg:col-span-5 bg-[#161616] border border-[#2E2E2E] rounded-lg flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-[#2E2E2E]">
+                <h3 class="text-xs font-bold text-[#F7941D] uppercase tracking-wide">👁️ Prévisualisation</h3>
+                <div class="flex gap-1">
+                    <button onclick="setBg('fabric')" aria-label="Fond tissu" class="px-2 py-0.5 text-[10px] bg-[#1F1F1F] hover:bg-[#2E2E2E] rounded border border-[#2E2E2E] hover:border-[#F7941D] transition-colors">👕</button>
+                    <button onclick="setBg('checker')" aria-label="Fond damier" class="px-2 py-0.5 text-[10px] bg-[#1F1F1F] hover:bg-[#2E2E2E] rounded border border-[#2E2E2E] hover:border-[#F7941D] transition-colors">♟</button>
+                    <button onclick="setBg('black')" aria-label="Fond noir" class="px-2 py-0.5 text-[10px] bg-[#1F1F1F] hover:bg-[#2E2E2E] rounded border border-[#2E2E2E] hover:border-[#F7941D] transition-colors">■</button>
+                    <button onclick="setBg('white')" aria-label="Fond blanc" class="px-2 py-0.5 text-[10px] bg-[#1F1F1F] hover:bg-[#2E2E2E] rounded border border-[#2E2E2E] hover:border-[#F7941D] transition-colors">□</button>
+                </div>
+            </div>
+            <div class="flex-1 relative flex items-center justify-center p-2 overflow-hidden min-h-[300px]" id="previewContainer" style="background:#000000">
+                <div id="checkerBg" class="absolute inset-0 opacity-0 pointer-events-none" style="background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;"></div>
+                <canvas id="canvas" class="max-w-full max-h-full object-contain relative z-10 cursor-crosshair"></canvas>
+                
+                <!-- Empty State amélioré -->
+                <div id="placeholderText" class="text-[#9C9C9C] text-sm absolute z-0 text-center p-4">
+                    <p class="font-bold text-[#F7941D] mb-2">Prêt à optimiser ?</p>
+                    <p class="text-xs">1. Connexion → 2. Charger une image → 3. Optimiser</p>
+                </div>
+                
+                <div id="dimensionInfo" class="absolute bottom-2 left-2 tb-badge px-2 py-0.5 rounded z-20">—</div>
+                <div id="fabricInfo" class="absolute top-2 left-2 tb-badge px-2 py-0.5 rounded z-20">👕 Noir</div>
+                <div id="clickHint" class="absolute top-2 text-[10px] text-[#FFD9A8] bg-[#0A0A0A]/90 px-2 py-0.5 rounded border border-[#F7941D] hidden z-20"> Cliquez sur le fond</div>
+                <div id="perfInfo" class="absolute top-2 right-2 text-[10px] text-[#9C9C9C] bg-[#0A0A0A]/90 px-2 py-0.5 rounded border border-[#2E2E2E] z-20"></div>
+            </div>
+            <div class="px-3 py-2 border-t border-[#2E2E2E] flex flex-col sm:flex-row gap-2">
+                <button id="downloadBtn" disabled class="tb-btn-primary flex-1 py-1.5 rounded-md transition text-xs disabled:cursor-not-allowed disabled:opacity-50">📥 PNG Couleur</button>
+                <button id="downloadWhiteBtn" disabled class="tb-btn-secondary flex-1 py-1.5 rounded-md transition text-xs disabled:cursor-not-allowed disabled:opacity-50">⚪ White Base</button>
+            </div>
+        </div>
+
+        <!-- COLONNE 2 : CONTROLES -->
+        <div class="col-span-12 lg:col-span-4 ctrl-column flex flex-col gap-2">
+
+            <div class="section">
+                <h3> Suppression du fond</h3>
+                <div class="ctrl-row">
+                    <label for="bgRemovalMode">Méthode</label>
+                    <select id="bgRemovalMode" class="tb-input rounded">
+                        <option value="auto">Méthode : Auto (coins)</option>
+                        <option value="picker">Manuelle</option>
+                        <option value="click">Pipette</option>
+                        <option value="none">Aucune</option>
+                    </select>
+                </div>
+                <div id="manualColorContainer" class="ctrl-row hidden">
+                    <label for="customBgColor">Couleur</label>
+                    <input type="color" id="customBgColor" value="#000000" class="w-12 h-6 rounded cursor-pointer bg-transparent border border-[#2E2E2E]">
+                </div>
+                <div class="ctrl-row">
+                    <label for="bgTolerance">Tolérance</label>
+                    <input type="range" id="bgTolerance" min="0" max="100" value="30">
+                    <span class="val" id="valTolerance">30</span>
+                </div>
+                <div id="debugInfo" class="text-[10px] text-[#FFB25A] mt-1 hidden">📊 <span id="debugText"></span></div>
+            </div>
+
+            <div class="section">
+                <h3>🛡️ Anti-halo & Luma Key</h3>
+                <div class="ctrl-row">
+                    <label for="erodePixels">Choke</label>
+                    <input type="range" id="erodePixels" min="0" max="10" value="0">
+                    <span class="val" id="valErode">0</span>
+                </div>
+                <div class="ctrl-row">
+                    <label for="lumaMode">Mode Luma</label>
+                    <select id="lumaMode" class="tb-input rounded">
+                        <option value="off" selected>Off (recommandé t-shirt noir)</option>
+                        <option value="soft">🛡️ Doux (fond plat seul)</option>
+                        <option value="dark">Noirs (agressif)</option>
+                        <option value="light">Blancs (tissu clair)</option>
+                        <option value="auto">Auto (tissu)</option>
+                    </select>
+                </div>
+                <div class="ctrl-row">
+                    <label for="lumaT">Seuil</label>
+                    <input type="range" id="lumaT" min="0" max="255" value="40">
+                    <span class="val" id="valLumaT">40</span>
+                </div>
+                <div class="ctrl-row">
+                    <label for="lumaS">Douceur</label>
+                    <input type="range" id="lumaS" min="10" max="200" value="60">
+                    <span class="val" id="valLumaS">60</span>
+                </div>
+                <p class="text-[9px] text-[#9C9C9C] mt-1 leading-tight">💡 T-shirt noir : laissez <b>Off</b> — la White Base gère le fond.</p>
+            </div>
+
+            <div class="section">
+                <h3>🧹 Nettoyage contours</h3>
+                <div class="ctrl-row">
+                    <label for="enableFillHoles" class="flex items-center gap-2" style="flex:0 0 115px;">
+                        <input type="checkbox" id="enableFillHoles" class="w-4 h-4" checked> Reboucher les trous
+                    </label>
+                    <input type="range" id="fillHolesSize" min="1" max="40" value="14">
+                    <span class="val" id="valFillHoles">14</span>
+                </div>
+                <div class="ctrl-row">
+                    <label for="enableDefringe" class="flex items-center gap-2" style="flex:0 0 115px;">
+                        <input type="checkbox" id="enableDefringe" class="w-4 h-4" checked> Nettoyer frange
+                    </label>
+                    <input type="range" id="defringePx" min="1" max="6" value="2">
+                    <span class="val" id="valDefringe">2</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🎨 Couleurs</h3>
+                <div class="ctrl-row">
+                    <label for="enableBoost" class="flex items-center gap-2" style="flex:0 0 115px;">
+                        <input type="checkbox" id="enableBoost" class="w-4 h-4" checked> 💪 Renforcer
+                    </label>
+                </div>
+                <div class="ctrl-row">
+                    <label for="boostSat">Saturation</label>
+                    <input type="range" id="boostSat" min="100" max="220" value="135">
+                    <span class="val" id="valBoostSat">135</span>
+                </div>
+                <div class="ctrl-row">
+                    <label for="boostCon">Contraste</label>
+                    <input type="range" id="boostCon" min="100" max="180" value="118">
+                    <span class="val" id="valBoostCon">118</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>✨ Finitions</h3>
+                <div class="ctrl-row">
+                    <label for="enableHalftone" class="flex items-center gap-2" style="flex:0 0 90px;">
+                        <input type="checkbox" id="enableHalftone" class="w-4 h-4"> Halftone
+                    </label>
+                    <input type="range" id="dotSize" min="3" max="15" value="6">
+                    <span class="val" id="valDotSize">6</span>
+                </div>
+                <div class="ctrl-row">
+                    <label for="enableGrunge" class="flex items-center gap-2" style="flex:0 0 90px;">
+                        <input type="checkbox" id="enableGrunge" class="w-4 h-4"> Grunge
+                    </label>
+                    <input type="range" id="grungeIntensity" min="10" max="70" value="30">
+                    <span class="val" id="valGrunge">30</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNE 3 : TISSU + DIMENSIONS -->
+        <div class="col-span-12 lg:col-span-3 ctrl-column flex flex-col gap-2">
+
+            <div class="section">
+                <h3>👕 Couleur tissu</h3>
+                <div class="swatch-grid mb-2" id="fabricSwatches">
+                    <div class="fabric-swatch active-swatch" style="background:#000000" data-color="#000000" data-name="Noir" role="button" aria-label="Tissu Noir"></div>
+                    <div class="fabric-swatch" style="background:#ffffff" data-color="#ffffff" data-name="Blanc" role="button" aria-label="Tissu Blanc"></div>
+                    <div class="fabric-swatch" style="background:#6b7280" data-color="#6b7280" data-name="Gris" role="button" aria-label="Tissu Gris"></div>
+                    <div class="fabric-swatch" style="background:#1e3a8a" data-color="#1e3a8a" data-name="Marine" role="button" aria-label="Tissu Marine"></div>
+                    <div class="fabric-swatch" style="background:#1d4ed8" data-color="#1d4ed8" data-name="Royal" role="button" aria-label="Tissu Royal"></div>
+                    <div class="fabric-swatch" style="background:#dc2626" data-color="#dc2626" data-name="Rouge" role="button" aria-label="Tissu Rouge"></div>
+                    <div class="fabric-swatch" style="background:#be185d" data-color="#be185d" data-name="Rose" role="button" aria-label="Tissu Rose"></div>
+                    <div class="fabric-swatch" style="background:#556b2f" data-color="#556b2f" data-name="Olive" role="button" aria-label="Tissu Olive"></div>
+                    <div class="fabric-swatch" style="background:#7c2d12" data-color="#7c2d12" data-name="Marron" role="button" aria-label="Tissu Marron"></div>
+                    <div class="fabric-swatch" style="background:#F7941D" data-color="#F7941D" data-name="Orange VXEL" role="button" aria-label="Tissu Orange VXEL"></div>
+                    <div class="fabric-swatch" style="background:#ea580c" data-color="#ea580c" data-name="Orange" role="button" aria-label="Tissu Orange"></div>
+                    <div class="fabric-swatch" style="background:#65a30d" data-color="#65a30d" data-name="Vert" role="button" aria-label="Tissu Vert"></div>
+                    <div class="fabric-swatch" style="background:#0891b2" data-color="#0891b2" data-name="Turquoise" role="button" aria-label="Tissu Turquoise"></div>
+                    <div class="fabric-swatch" style="background:#7c3aed" data-color="#7c3aed" data-name="Violet" role="button" aria-label="Tissu Violet"></div>
+                    <div class="fabric-swatch" style="background:#0f172a" data-color="#0f172a" data-name="Anthracite" role="button" aria-label="Tissu Anthracite"></div>
+                    <div class="fabric-swatch" style="background:#f5f5dc" data-color="#f5f5dc" data-name="Écru" role="button" aria-label="Tissu Écru"></div>
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="color" id="fabricColor" value="#000000" class="w-8 h-6 rounded border border-[#2E2E2E] cursor-pointer bg-transparent" aria-label="Sélecteur de couleur personnalisé">
+                    <input type="text" id="fabricHex" value="#000000" class="tb-input rounded px-2 py-1 flex-1 font-mono" aria-label="Code hexadécimal de la couleur">
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <label for="enableFabricOpt" class="text-[#F0F0F0] font-semibold cursor-pointer">Auto-optim</label>
+                    <input type="checkbox" id="enableFabricOpt" class="w-4 h-4 cursor-pointer">
+                </div>
+                <div id="fabricModeInfo" class="mt-2 p-1.5 bg-[#2a1a05] border border-[#F7941D] rounded text-[10px] text-[#FFD9A8]">
+                    <b>🖤 Tissu foncé :</b> laissez Luma Off, la White Base suffit
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📐 Upscale & Dimensions</h3>
+                <div class="ctrl-row">
+                    <label for="scaleFactor">Upscale</label>
+                    <select id="scaleFactor" class="tb-input rounded">
+                        <option value="1">1x</option>
+                        <option value="2" selected>2x</option>
+                        <option value="3">3x</option>
+                        <option value="4">4x</option>
+                    </select>
+                    <span class="val" id="valScale" style="color:#FFB25A;">2x</span>
+                </div>
+                <div class="flex items-center justify-between text-xs mt-1 mb-1">
+                    <label for="enableCrop" class="text-[#F0F0F0] font-semibold cursor-pointer">Recadrage auto</label>
+                    <input type="checkbox" id="enableCrop" checked class="w-4 h-4 cursor-pointer">
+                </div>
+                <div class="ctrl-row">
+                    <label for="fitMode">Redimension</label>
+                    <select id="fitMode" class="tb-input rounded">
+                        <option value="tight" selected>🎯 Ajusté au design</option>
+                        <option value="frame">⬜ Cadre fixe (marges)</option>
+                    </select>
+                </div>
+                <div id="dimensionControls" class="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                        <label for="targetWidthCm" class="block text-[10px] text-[#9C9C9C] mb-0.5">Largeur max (cm)</label>
+                        <input type="number" id="targetWidthCm" value="29" min="1" max="100" class="w-full tb-input rounded px-2 py-1">
+                    </div>
+                    <div>
+                        <label for="targetHeightCm" class="block text-[10px] text-[#9C9C9C] mb-0.5">Hauteur max (cm)</label>
+                        <input type="number" id="targetHeightCm" value="34" min="1" max="100" class="w-full tb-input rounded px-2 py-1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section" style="background: linear-gradient(135deg, rgba(247,148,29,.08), rgba(10,10,10,.8));">
+                <h3 style="border-bottom-color: rgba(247,148,29,.3);">💡 Astuce Pro</h3>
+                <p class="text-[10px] text-[#9C9C9C] leading-tight">
+                    <span class="text-[#F7941D] font-bold">Couleurs délavées ?</span> cochez <b>💪 Renforcer</b>.<br>
+                    <span class="text-[#F7941D] font-bold">T-shirt noir :</span> Luma <b>Off</b> + fond <b>Auto</b> + <b>Reboucher les trous</b>.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts chargés dans l'ordre -->
+    <script src="app.js"></script>
+    <script src="vexel.js"></script>
+</body>
+</html>
