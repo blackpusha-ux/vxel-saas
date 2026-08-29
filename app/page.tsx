@@ -1,4 +1,5 @@
-'use client';
+   <h1 className="text-4xl font-bold text-green-400 mb-4">✅ VERSION FINALE NETLIFY - TEST</h1>
+   'use client';
 
 import { SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { useAuth } from '@clerk/nextjs';
