@@ -13,8 +13,8 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider> {/* ⚠️ C'est ce bloc qui active les boutons de connexion ! */}
-      <html lang="fr">
-        <body className="bg-gray-900 text-white min-h-screen">
+      <html lang="fr" className="dark">
+        <body className="bg-[#0A0A0A] text-white min-h-screen">
           {children}
         </body>
       </html>
