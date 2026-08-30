@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectDB } from '@/lib/db';
+import { deductCredits } from '@/lib/credits';
 
 export async function POST() {
   try {
@@ -9,26 +9,15 @@ export async function POST() {
       return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
     }
 
-    const db = await connectDB();
-    const usersCol = db.collection('users');
+    const result = await deductCredits(userId, 1);
 
-    const result = await usersCol.findOneAndUpdate(
-      { $or: [{ clerkId: userId }, { userId: userId }], credits: { $gt: 0 } },
-      { $inc: { credits: -1 }, $set: { updatedAt: new Date().toISOString() } },
-      { returnDocument: 'after' }
-    );
-
-    if (!result) {
-      const exists = await usersCol.findOne({ $or: [{ clerkId: userId }, { userId: userId }] });
-      if (!exists) {
-        return NextResponse.json({ success: false, error: 'Utilisateur non trouvé' }, { status: 404 });
-      }
+    if (!result.success) {
       return NextResponse.json({ success: false, error: 'Crédits insuffisants !' }, { status: 403 });
     }
 
     return NextResponse.json({
       success: true,
-      creditsRemaining: result.credits,
+      creditsRemaining: result.creditsRemaining,
     });
   } catch (e: any) {
     console.error('Erreur consume-credit:', e);

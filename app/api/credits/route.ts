@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { connectDB } from '@/lib/db';
+import User from '@/models/User';
 
 export async function GET() {
   try {
@@ -12,30 +13,22 @@ export async function GET() {
     const clerkUser = await currentUser();
     const primaryEmail = clerkUser?.emailAddresses?.[0]?.emailAddress || '';
 
-    const db = await connectDB();
-    const usersCol = db.collection('users');
+    await connectDB();
 
-    let user = await usersCol.findOne({
-      $or: [{ clerkId: userId }, { userId: userId }],
-    });
+    let user = await User.findOne({ clerkId: userId });
 
     if (!user) {
-      const newUser = {
+      user = await User.create({
         clerkId: userId,
-        userId: userId,
         email: primaryEmail,
+        name: clerkUser?.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : '',
         credits: 10,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      await usersCol.insertOne(newUser);
-      return NextResponse.json({ success: true, credits: 10, email: primaryEmail });
+      });
     }
 
-    const currentCredits = typeof user.credits === 'number' ? user.credits : 10;
     return NextResponse.json({
       success: true,
-      credits: currentCredits,
+      credits: user.credits,
       email: user.email || primaryEmail,
     });
   } catch (e: any) {

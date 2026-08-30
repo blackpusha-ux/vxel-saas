@@ -2,24 +2,14 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 const isProtectedRoute = createRouteMatcher([
-  '/dtf-studio(.*)',
+  '/admin(.*)',
   '/dashboard(.*)',
+  '/dtf-studio(.*)',
+  '/dtf-planche(.*)',
   '/profile(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (
-    req.nextUrl.pathname.startsWith('/_next') ||
-    req.nextUrl.pathname.startsWith('/api') ||
-    req.nextUrl.pathname === '/' ||
-    req.nextUrl.pathname === '/sign-in' ||
-    req.nextUrl.pathname === '/sign-up' ||
-    req.nextUrl.pathname.startsWith('/favicon.ico') ||
-    req.nextUrl.pathname.startsWith('/public')
-  ) {
-    return NextResponse.next();
-  }
-
   if (isProtectedRoute(req)) {
     await auth.protect();
   }

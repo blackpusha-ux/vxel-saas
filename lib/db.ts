@@ -1,59 +1,55 @@
 import dns from 'node:dns';
-import { MongoClient, Db } from 'mongodb';
+import mongoose from 'mongoose';
 
-// Forcer la résolution DNS en IPv4 pour corriger le bug Windows / Node.js sur les URIs SRV (ECONNREFUSED ::1:27017)
+// Fix IPv4 DNS resolution for Windows / Node.js
 try {
   dns.setDefaultResultOrder('ipv4first');
-} catch {
-  // Ignorer si déjà défini
-}
+} catch {}
 
-function getMongoUri(): string {
-  const uri = process.env.MONGO_URI;
-  if (!uri || uri.trim() === '') {
-    throw new Error('MONGO_URI n\'est pas configuré dans .env.local');
-  }
-  return uri;
-}
+const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || '';
 
 declare global {
   // eslint-disable-next-line no-var
-  var _mongoClientPromise: Promise<MongoClient> | undefined;
+  var mongooseCache: {
+    conn: typeof mongoose | null;
+    promise: Promise<typeof mongoose> | null;
+  };
 }
 
-export async function getClientPromise(): Promise<MongoClient> {
-  const uri = getMongoUri();
+let cached = global.mongooseCache;
 
-  if (process.env.NODE_ENV === 'development') {
-    if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri, {
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-      });
-      global._mongoClientPromise = client.connect().catch((err) => {
-        // En cas d'erreur, réinitialiser la promesse pour retenter proprement
-        global._mongoClientPromise = undefined;
-        throw err;
-      });
-    }
-    return global._mongoClientPromise;
+if (!cached) {
+  cached = global.mongooseCache = { conn: null, promise: null };
+}
+
+export async function connectDB(): Promise<typeof mongoose> {
+  if (!MONGODB_URI) {
+    throw new Error('Veuillez définir la variable d\'environnement MONGO_URI');
   }
 
-  const client = new MongoClient(uri, {
-    serverSelectionTimeoutMS: 10000,
-    connectTimeoutMS: 10000,
-  });
-  return client.connect();
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 10000,
+    };
+
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
+      return mongooseInstance;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
 }
 
-export async function connectDB(dbName = 'vexel'): Promise<Db> {
-  const connectedClient = await getClientPromise();
-  return connectedClient.db(dbName);
-}
-
-export async function getUsersCollection() {
-  const db = await connectDB('vexel');
-  return db.collection('users');
-}
-
-export default getClientPromise();
+export default connectDB;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectDB } from '@/lib/db';
+import { addCredits } from '@/lib/credits';
 
 export async function POST(req: Request) {
   try {
@@ -16,20 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Nombre de crédits invalide' }, { status: 400 });
     }
 
-    const db = await connectDB();
-    const usersCol = db.collection('users');
-
-    const result = await usersCol.findOneAndUpdate(
-      { $or: [{ clerkId: userId }, { userId: userId }] },
-      {
-        $inc: { credits: amount },
-        $set: { updatedAt: new Date().toISOString() },
-        $setOnInsert: { clerkId: userId, userId: userId, createdAt: new Date().toISOString() }
-      },
-      { upsert: true, returnDocument: 'after' }
-    );
-
-    const updatedCredits = result?.credits ?? amount;
+    const updatedCredits = await addCredits(userId, amount);
 
     return NextResponse.json({
       success: true,

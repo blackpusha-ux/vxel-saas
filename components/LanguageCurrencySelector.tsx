@@ -6,6 +6,7 @@ import { Locale } from '@/lib/i18n';
 import { CurrencyCode, currencies } from '@/lib/currencies';
 import { useTranslation } from '@/lib/LanguageContext';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { useAppContext } from '@/contexts/AppContext';
 
 const languagesList: { code: Locale; name: string; flag: string }[] = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
@@ -14,16 +15,17 @@ const languagesList: { code: Locale; name: string; flag: string }[] = [
 ];
 
 const currenciesList: { code: CurrencyCode; symbol: string; name: string }[] = [
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'GBP', symbol: '£', name: 'Pound' },
   { code: 'CAD', symbol: 'CA$', name: 'CAD' },
-  { code: 'TND', symbol: 'د.ت', name: 'Dinar' },
+  { code: 'USD', symbol: '$', name: 'USD' },
+  { code: 'EUR', symbol: '€', name: 'EUR' },
+  { code: 'GBP', symbol: '£', name: 'GBP' },
+  { code: 'TND', symbol: 'د.ت', name: 'TND' },
 ];
 
-export default function LanguageCurrencySelector() {
+export default function LanguageCurrencySelector({ isMobile = false }: { isMobile?: boolean }) {
   const { lang, setLang } = useTranslation();
   const { currency, setCurrency } = useCurrency();
+  const { setCurrency: setAppCurrency } = useAppContext();
 
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -41,17 +43,76 @@ export default function LanguageCurrencySelector() {
 
   const handleSelectLang = (newLang: Locale) => {
     setLang(newLang);
+    localStorage.setItem('vexel_lang', newLang);
+    localStorage.setItem('vxel_lang', newLang);
     setIsOpen(false);
   };
 
   const handleSelectCurr = (newCurr: string) => {
     setCurrency(newCurr);
+    setAppCurrency(newCurr);
+    localStorage.setItem('vexel_currency', newCurr);
+    localStorage.setItem('vxel_currency', newCurr);
     setIsOpen(false);
   };
 
   const activeLangObj = languagesList.find((l) => l.code === lang) || languagesList[0];
-  const activeCurrObj = currencies[currency as CurrencyCode] || currencies.EUR;
+  const activeCurrObj = currencies[currency as CurrencyCode] || currencies.CAD;
 
+  if (isMobile) {
+    return (
+      <div className="space-y-4 p-3 bg-[#161616] border border-[#2E2E2E] rounded-xl">
+        {/* Mobile Languages: 3 horizontal buttons with flags */}
+        <div>
+          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Langue</div>
+          <div className="grid grid-cols-3 gap-2">
+            {languagesList.map((item) => {
+              const isSelected = item.code === lang;
+              return (
+                <button
+                  key={item.code}
+                  onClick={() => handleSelectLang(item.code)}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all border ${
+                    isSelected
+                      ? 'bg-[#F7941D] text-black border-[#F7941D]'
+                      : 'bg-[#0A0A0A] border-[#2E2E2E] text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  <span>{item.flag}</span>
+                  <span>{item.code.toUpperCase()}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Currencies: horizontal scroll list */}
+        <div>
+          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Devise</div>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {currenciesList.map((item) => {
+              const isSelected = item.code === currency;
+              return (
+                <button
+                  key={item.code}
+                  onClick={() => handleSelectCurr(item.code)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                    isSelected
+                      ? 'bg-[#F7941D] text-black border-[#F7941D]'
+                      : 'bg-[#0A0A0A] border-[#2E2E2E] text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  {item.symbol} {item.code}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Dropdown
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
@@ -60,9 +121,7 @@ export default function LanguageCurrencySelector() {
         aria-label="Sélectionner la langue et la devise"
       >
         <Globe className="w-4 h-4 text-[#F7941D]" />
-        <span className="font-bold">{activeLangObj.flag} {lang.toUpperCase()}</span>
-        <span className="text-slate-500">•</span>
-        <span className="font-semibold text-[#F7941D]">{activeCurrObj.symbol}</span>
+        <span className="font-bold">{activeLangObj.code.toUpperCase()} • {activeCurrObj.code}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
