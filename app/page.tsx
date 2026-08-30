@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, X, Image, Scissors, Printer, Zap, Check, ArrowRight, Mail, MapPin, Layers } from 'lucide-react';
+import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,10 +51,11 @@ export default function Home() {
               <div className="w-8 h-8 bg-[#F7941D] rounded-md flex items-center justify-center text-black font-bold">V</div>
               <span className="text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
             </Link>
-            <div className="hidden md:flex space-x-8 items-center">
+            <div className="hidden md:flex space-x-6 items-center">
               <a href="#services" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Services</a>
               <a href="#process" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Processus</a>
               <a href="#portfolio" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Galerie</a>
+              <LanguageCurrencySelector />
               <Link href="/dtf-studio" className="px-5 py-2.5 bg-[#F7941D] text-black rounded-full font-bold text-sm hover:bg-[#FFB25A] transition-all shadow-lg shadow-[#F7941D]/20 hover:shadow-[#F7941D]/40 flex items-center gap-2">
                 Essayer l'outil <ArrowRight className="w-4 h-4" />
               </Link>

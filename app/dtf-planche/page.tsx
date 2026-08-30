@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer } from 'lucide-react';
+import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 
 interface QueueItem {
   src: string;
@@ -171,6 +172,9 @@ export default function DTFPlanchePage() {
             Charger des images
             <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
           </label>
+        </div>
+        <div>
+          <LanguageCurrencySelector />
         </div>
       </header>
 

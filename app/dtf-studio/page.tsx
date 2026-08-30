@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 
 interface FabricSwatch {
   name: string;
@@ -601,6 +602,7 @@ export default function DTFStudioPage() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <LanguageCurrencySelector />
           {isLoaded && isSignedIn && (
             <div className="flex items-center gap-2">
               <span className="bg-[#0A0A0A] border border-[#F7941D] text-[#FFD9A8] px-3 py-1 rounded-lg text-xs font-extrabold">
