@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Globe, ChevronDown, Check } from 'lucide-react';
-import { Language, getLanguage, setLanguage } from '@/lib/i18n';
-import { CurrencyCode, currencies, getCurrency, setCurrency } from '@/lib/currencies';
+import { Locale } from '@/lib/i18n';
+import { CurrencyCode, currencies } from '@/lib/currencies';
+import { useTranslation } from '@/lib/LanguageContext';
+import { useCurrency } from '@/lib/CurrencyContext';
 
-const languagesList: { code: Language; name: string; flag: string }[] = [
+const languagesList: { code: Locale; name: string; flag: string }[] = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'es', name: 'Español', flag: '🇪🇸' },
@@ -20,23 +22,11 @@ const currenciesList: { code: CurrencyCode; symbol: string; name: string }[] = [
 ];
 
 export default function LanguageCurrencySelector() {
-  const [lang, setLangState] = useState<Language>('fr');
-  const [curr, setCurrState] = useState<CurrencyCode>('EUR');
+  const { lang, setLang } = useTranslation();
+  const { currency, setCurrency } = useCurrency();
+
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setLangState(getLanguage());
-    setCurrState(getCurrency());
-
-    const handleSettingsChange = () => {
-      setLangState(getLanguage());
-      setCurrState(getCurrency());
-    };
-
-    window.addEventListener('vxel-settings-changed', handleSettingsChange);
-    return () => window.removeEventListener('vxel-settings-changed', handleSettingsChange);
-  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -49,18 +39,18 @@ export default function LanguageCurrencySelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectLang = (newLang: Language) => {
-    setLanguage(newLang);
+  const handleSelectLang = (newLang: Locale) => {
+    setLang(newLang);
     setIsOpen(false);
   };
 
-  const handleSelectCurr = (newCurr: CurrencyCode) => {
+  const handleSelectCurr = (newCurr: string) => {
     setCurrency(newCurr);
     setIsOpen(false);
   };
 
   const activeLangObj = languagesList.find((l) => l.code === lang) || languagesList[0];
-  const activeCurrObj = currencies[curr] || currencies.EUR;
+  const activeCurrObj = currencies[currency as CurrencyCode] || currencies.EUR;
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
@@ -113,7 +103,7 @@ export default function LanguageCurrencySelector() {
             </div>
             <div className="grid grid-cols-1 gap-1">
               {currenciesList.map((item) => {
-                const isSelected = item.code === curr;
+                const isSelected = item.code === currency;
                 return (
                   <button
                     key={item.code}

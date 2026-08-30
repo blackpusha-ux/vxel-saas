@@ -1,4 +1,5 @@
 export type Language = 'fr' | 'en' | 'es';
+export type Locale = Language;
 
 export interface Translations {
   nav: {

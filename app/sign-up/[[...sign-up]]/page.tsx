@@ -4,10 +4,12 @@ import React, { useState } from 'react';
 import { useSignUp, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, UserCheck, Mail, Phone, Building, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import { User, UserCheck, Mail, Phone, Building, Lock, ArrowRight } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/lib/LanguageContext';
 
 export default function CustomSignUpPage() {
+  const { t } = useTranslation();
   const { isLoaded, signUp } = useSignUp() as any;
   const { loaded: clerkLoaded } = useClerk();
   const router = useRouter();
@@ -91,7 +93,7 @@ export default function CustomSignUpPage() {
         <div className="w-full max-w-md bg-[#161616] border border-[#2E2E2E] rounded-2xl p-8 shadow-2xl backdrop-blur-md">
           {/* Header text */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-white mb-2">Créer un compte</h1>
+            <h1 className="text-3xl font-extrabold text-white mb-2">{t.auth.signUp}</h1>
             <p className="text-sm text-slate-400">Accédez instantanément à vos outils VXEL DTF Studio Pro</p>
           </div>
 
@@ -127,13 +129,13 @@ export default function CustomSignUpPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Continuer avec Google</span>
+            <span>{t.auth.continueWithGoogle}</span>
           </button>
 
           {/* Separator "ou" */}
           <div className="my-6 flex items-center gap-4">
             <div className="flex-1 h-px bg-[#2E2E2E]" />
-            <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">ou</span>
+            <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">{t.auth.or}</span>
             <div className="flex-1 h-px bg-[#2E2E2E]" />
           </div>
 
@@ -145,14 +147,14 @@ export default function CustomSignUpPage() {
               className="w-full py-3.5 px-4 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl shadow-lg shadow-[#F7941D]/20 transition-all flex items-center justify-center gap-2"
             >
               <Mail className="w-5 h-5" />
-              <span>S'inscrire avec email</span>
+              <span>{t.auth.signUpWithEmail}</span>
             </button>
           ) : (
             <form onSubmit={handleSubmitEmailSignUp} className="space-y-4">
               {/* Prénom & Nom */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Prénom *</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.firstName} *</label>
                   <div className="relative">
                     <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
@@ -167,7 +169,7 @@ export default function CustomSignUpPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Nom *</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.lastName} *</label>
                   <div className="relative">
                     <UserCheck className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
@@ -184,7 +186,7 @@ export default function CustomSignUpPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Email *</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.email} *</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
@@ -200,7 +202,7 @@ export default function CustomSignUpPage() {
 
               {/* Téléphone */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Téléphone</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.phone}</label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
@@ -215,7 +217,7 @@ export default function CustomSignUpPage() {
 
               {/* Entreprise (Optionnel) */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Entreprise <span className="text-slate-500 font-normal">(optionnel)</span></label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.company}</label>
                 <div className="relative">
                   <Building className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
@@ -230,7 +232,7 @@ export default function CustomSignUpPage() {
 
               {/* Mot de passe */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Mot de passe *</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">{t.auth.password} *</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
@@ -251,7 +253,7 @@ export default function CustomSignUpPage() {
                 disabled={loading}
                 className="w-full py-3.5 px-4 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl shadow-lg shadow-[#F7941D]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
               >
-                <span>Créer mon compte VXEL</span>
+                <span>{t.auth.submitSignUp}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -259,9 +261,9 @@ export default function CustomSignUpPage() {
 
           {/* Already have account */}
           <div className="mt-8 text-center text-xs text-slate-400">
-            Vous avez déjà un compte ?{' '}
+            {t.auth.alreadyHaveAccount}{' '}
             <Link href="/sign-in" className="text-[#F7941D] hover:underline font-bold">
-              Se connecter
+              {t.auth.signIn}
             </Link>
           </div>
         </div>
@@ -269,7 +271,7 @@ export default function CustomSignUpPage() {
 
       {/* Footer */}
       <footer className="max-w-7xl w-full mx-auto text-center py-4 text-xs text-slate-600">
-        © {new Date().getFullYear()} VXEL DTF Studio Pro. Tous droits réservés.
+        © {new Date().getFullYear()} VXEL DTF Studio Pro. {t.footer.rights}
       </footer>
     </div>
   );

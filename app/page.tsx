@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, X, Image, Scissors, Printer, Zap, Check, ArrowRight, Mail, MapPin, Layers } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/lib/LanguageContext';
 
 export default function Home() {
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -52,12 +54,12 @@ export default function Home() {
               <span className="text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
             </Link>
             <div className="hidden md:flex space-x-6 items-center">
-              <a href="#services" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Services</a>
-              <a href="#process" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Processus</a>
-              <a href="#portfolio" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">Galerie</a>
+              <a href="#services" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">{t.nav.services}</a>
+              <a href="#process" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">{t.nav.process}</a>
+              <a href="#portfolio" className="text-sm font-medium text-slate-300 hover:text-[#F7941D] transition-colors">{t.nav.portfolio}</a>
               <LanguageCurrencySelector />
               <Link href="/dtf-studio" className="px-5 py-2.5 bg-[#F7941D] text-black rounded-full font-bold text-sm hover:bg-[#FFB25A] transition-all shadow-lg shadow-[#F7941D]/20 hover:shadow-[#F7941D]/40 flex items-center gap-2">
-                Essayer l'outil <ArrowRight className="w-4 h-4" />
+                {t.nav.tryTool} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden text-slate-300 hover:text-[#F7941D]">
@@ -68,10 +70,11 @@ export default function Home() {
         {isMenuOpen && (
           <div className="md:hidden absolute top-full left-0 w-full bg-[#161616] border-b border-[#2E2E2E] shadow-2xl">
             <div className="px-4 py-6 space-y-4">
-              <a href="#services" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">Services</a>
-              <a href="#process" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">Processus</a>
-              <a href="#portfolio" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">Galerie</a>
-              <Link href="/dtf-studio" onClick={() => setIsMenuOpen(false)} className="block w-full text-center px-5 py-3 bg-[#F7941D] text-black rounded-lg font-bold">Essayer l'outil</Link>
+              <a href="#services" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">{t.nav.services}</a>
+              <a href="#process" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">{t.nav.process}</a>
+              <a href="#portfolio" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-[#F7941D] font-medium">{t.nav.portfolio}</a>
+              <div className="py-2"><LanguageCurrencySelector /></div>
+              <Link href="/dtf-studio" onClick={() => setIsMenuOpen(false)} className="block w-full text-center px-5 py-3 bg-[#F7941D] text-black rounded-lg font-bold">{t.nav.tryTool}</Link>
             </div>
           </div>
         )}
@@ -83,21 +86,21 @@ export default function Home() {
         <div className={`relative z-10 text-center px-4 max-w-5xl mx-auto reveal ${isVisible('home') ? 'active' : ''}`}>
           <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 backdrop-blur-sm">
             <Zap className="w-4 h-4 text-[#F7941D]" />
-            <span className="text-[#F7941D] font-semibold text-sm tracking-wide uppercase">Solution DTF Nouvelle Génération</span>
+            <span className="text-[#F7941D] font-semibold text-sm tracking-wide uppercase">{t.home.heroBadge}</span>
           </div>
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-white mb-6 tracking-tight leading-tight">
-            Vos visuels, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F7941D] to-[#FFB25A]">prêts à imprimer.</span>
+            {t.home.heroTitle1} <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F7941D] to-[#FFB25A]">{t.home.heroTitle2}</span>
           </h1>
           <p className="text-xl md:text-2xl text-slate-400 mb-10 max-w-3xl mx-auto font-light leading-relaxed">
-            Optimisation de nesting, détourage chirurgical anti-halo et préparation professionnelle de vos fichiers pour une impression DTF sans compromis.
+            {t.home.heroDesc}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/dtf-studio" className="px-8 py-4 bg-[#F7941D] text-black rounded-full font-bold text-lg hover:bg-[#FFB25A] transition-all shadow-xl shadow-[#F7941D]/30 hover:-translate-y-1 flex items-center justify-center gap-2">
-              Accéder au Studio <ArrowRight className="w-5 h-5" />
+              {t.home.accessStudio} <ArrowRight className="w-5 h-5" />
             </Link>
             <Link href="/dtf-planche" className="px-8 py-4 bg-[#161616] border border-[#2E2E2E] text-white rounded-full font-bold text-lg hover:bg-[#2E2E2E] transition-all hover:-translate-y-1 flex items-center justify-center gap-2">
-              <Layers className="w-5 h-5" /> Outil Planche
+              <Layers className="w-5 h-5" /> {t.home.plancheTool}
             </Link>
           </div>
         </div>
@@ -106,17 +109,17 @@ export default function Home() {
       <section id="services" className={`py-24 bg-[#0A0A0A] reveal ${isVisible('services') ? 'active' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">Notre Expertise</h2>
-            <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">Une préparation de fichier irréprochable</h3>
-            <p className="text-slate-400 text-lg">Chaque pixel compte. Nous automatisons les tâches complexes pour garantir un résultat d'impression parfait à chaque fois.</p>
+            <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">{t.home.expertiseSub}</h2>
+            <h3 className="text-4xl md:text-5xl font-bold text-white mb-4">{t.home.expertiseTitle}</h3>
+            <p className="text-slate-400 text-lg">{t.home.expertiseDesc}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="group bg-[#161616] p-8 rounded-2xl border border-[#2E2E2E] hover:border-[#F7941D]/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#F7941D]/10">
               <div className="w-14 h-14 bg-[#F7941D]/10 rounded-xl flex items-center justify-center text-[#F7941D] mb-6 group-hover:scale-110 transition-transform">
                 <Image className="w-7 h-7" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">Optimisation & Nesting</h4>
-              <p className="text-slate-400 mb-4 leading-relaxed">Agencement intelligent et automatique de vos motifs sur la laize de film. Réduisez vos chutes de film et maximisez la rentabilité de chaque impression.</p>
+              <h4 className="text-xl font-bold text-white mb-3">{t.home.nestingTitle}</h4>
+              <p className="text-slate-400 mb-4 leading-relaxed">{t.home.nestingDesc}</p>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Rotation automatique des motifs</li>
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Minimisation des espaces perdus</li>
@@ -126,8 +129,8 @@ export default function Home() {
               <div className="w-14 h-14 bg-[#F7941D]/10 rounded-xl flex items-center justify-center text-[#F7941D] mb-6 group-hover:scale-110 transition-transform">
                 <Scissors className="w-7 h-7" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">Détourage & Anti-Halo</h4>
-              <p className="text-slate-400 mb-4 leading-relaxed">Suppression de fond chirurgicale avec lissage des contours. Éliminez les bordures blanches (halos) pour un transfert net et professionnel sur tous les textiles.</p>
+              <h4 className="text-xl font-bold text-white mb-3">{t.home.antiHaloTitle}</h4>
+              <p className="text-slate-400 mb-4 leading-relaxed">{t.home.antiHaloDesc}</p>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Détection intelligente des bords</li>
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Lissage anti-crénelage</li>
@@ -137,8 +140,8 @@ export default function Home() {
               <div className="w-14 h-14 bg-[#F7941D]/10 rounded-xl flex items-center justify-center text-[#F7941D] mb-6 group-hover:scale-110 transition-transform">
                 <Printer className="w-7 h-7" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">Préparation Machine DTF</h4>
-              <p className="text-slate-400 mb-4 leading-relaxed">Calibrage des couleurs, gestion optimale des couches de blanc et export en PDF haute résolution prêt à l'emploi pour votre RIP et votre imprimante.</p>
+              <h4 className="text-xl font-bold text-white mb-3">{t.home.prepTitle}</h4>
+              <p className="text-slate-400 mb-4 leading-relaxed">{t.home.prepDesc}</p>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Profil colorimétrique optimisé</li>
                 <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#F7941D]" /> Export PDF vectoriel ou raster</li>
@@ -152,16 +155,16 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">Flux de Travail</h2>
-              <h3 className="text-4xl font-bold text-white mb-6">De l'import au fichier prêt à imprimer en 3 étapes</h3>
+              <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">{t.home.workflowSub}</h2>
+              <h3 className="text-4xl font-bold text-white mb-6">{t.home.workflowTitle}</h3>
               <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-                Notre studio en ligne simplifie la préparation de vos fichiers DTF. Plus besoin de logiciels lourds ou de compétences techniques avancées en graphisme.
+                {t.home.workflowDesc}
               </p>
               <div className="space-y-6">
                 {[
-                  { step: '01', title: 'Importation', desc: 'Glissez-déposez vos images (PNG, JPG, SVG). Notre système les analyse instantanément.' },
-                  { step: '02', title: 'Traitement', desc: 'Ajustez les dimensions, lancez le détourage automatique et optimisez le nesting sur la laize.' },
-                  { step: '03', title: 'Export', desc: 'Téléchargez votre planche au format PDF haute définition, calibrée pour votre machine.' }
+                  { step: '01', title: t.home.step1Title, desc: t.home.step1Desc },
+                  { step: '02', title: t.home.step2Title, desc: t.home.step2Desc },
+                  { step: '03', title: t.home.step3Title, desc: t.home.step3Desc }
                 ].map((item, idx) => (
                   <div key={idx} className="flex gap-4">
                     <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0A0A0A] border border-[#2E2E2E] flex items-center justify-center text-[#F7941D] font-bold font-mono">
@@ -210,8 +213,8 @@ export default function Home() {
       <section id="portfolio" className={`py-24 bg-[#0A0A0A] reveal ${isVisible('portfolio') ? 'active' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">Résultats Concrets</h2>
-            <h3 className="text-4xl md:text-5xl font-bold text-white">Galerie de Préparation</h3>
+            <h2 className="text-[#F7941D] font-bold tracking-wider uppercase text-sm mb-3">{t.home.gallerySub}</h2>
+            <h3 className="text-4xl md:text-5xl font-bold text-white">{t.home.galleryTitle}</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
@@ -237,10 +240,10 @@ export default function Home() {
       <section className="py-24 bg-[#F7941D] relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-extrabold text-black mb-6">Prêt à optimiser votre production DTF ?</h2>
-          <p className="text-black/80 text-xl mb-10 max-w-2xl mx-auto">Rejoignez les professionnels de l'impression qui gagnent du temps et de l'argent avec VXEL Studio.</p>
+          <h2 className="text-4xl md:text-5xl font-extrabold text-black mb-6">{t.home.readyCTA}</h2>
+          <p className="text-black/80 text-xl mb-10 max-w-2xl mx-auto">{t.home.readySub}</p>
           <Link href="/dtf-studio" className="inline-flex items-center gap-2 px-10 py-5 bg-black text-white rounded-full font-bold text-lg hover:bg-[#161616] transition-all shadow-2xl hover:scale-105">
-            Commencer gratuitement <ArrowRight className="w-5 h-5" />
+            {t.home.startFree} <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </section>
@@ -254,18 +257,18 @@ export default function Home() {
                 <span className="text-xl font-bold text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
               </div>
               <p className="text-sm max-w-xs leading-relaxed">
-                La solution tout-en-un pour la préparation, l'optimisation et l'export de vos fichiers d'impression Direct to Film.
+                {t.footer.desc}
               </p>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">Outils</h4>
+              <h4 className="text-white font-bold mb-4">{t.footer.tools}</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/dtf-studio" className="hover:text-[#F7941D] transition-colors">Studio d'Optimisation</Link></li>
-                <li><Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors">Générateur de Planche</Link></li>
+                <li><Link href="/dtf-studio" className="hover:text-[#F7941D] transition-colors">{t.nav.studio}</Link></li>
+                <li><Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors">{t.nav.planche}</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">Contact</h4>
+              <h4 className="text-white font-bold mb-4">{t.footer.contact}</h4>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-[#F7941D]" /> contact@vexel.com</li>
                 <li className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#F7941D]" /> VXEL Studio</li>
@@ -273,10 +276,10 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-[#2E2E2E] pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
-            <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. Tous droits réservés.</p>
+            <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. {t.footer.rights}</p>
             <div className="flex gap-6 mt-4 md:mt-0">
-              <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
-              <a href="#" className="hover:text-white transition-colors">Confidentialité</a>
+              <a href="#" className="hover:text-white transition-colors">{t.footer.terms}</a>
+              <a href="#" className="hover:text-white transition-colors">{t.footer.privacy}</a>
             </div>
           </div>
         </div>
