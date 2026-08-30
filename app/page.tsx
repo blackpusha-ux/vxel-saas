@@ -265,13 +265,13 @@ export default function Home() {
             <div>
               <h4 className="text-white font-bold mb-4">Contact</h4>
               <ul className="space-y-3 text-sm">
-                <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-[#F7941D]" /> contact.tbalbiza@gmail.com</li>
-                <li className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#F7941D]" /> TBALBIZA Studio</li>
+                <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-[#F7941D]" /> contact@vexel.com</li>
+                <li className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#F7941D]" /> VXEL Studio</li>
               </ul>
             </div>
           </div>
           <div className="border-t border-[#2E2E2E] pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
-            <p>© {new Date().getFullYear()} VXEL DTF Studio Pro (TBALBIZA). Tous droits réservés.</p>
+            <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. Tous droits réservés.</p>
             <div className="flex gap-6 mt-4 md:mt-0">
               <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
               <a href="#" className="hover:text-white transition-colors">Confidentialité</a>
