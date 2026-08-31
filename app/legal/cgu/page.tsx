@@ -41,7 +41,7 @@ export default function CGUPage() {
           <div>
             <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">2. Accès aux Services et Crédits</h2>
             <p>
-              L'accès aux fonctionnalités d'exportation nécessite un compte utilisateur valide et l'utilisation de crédits. Chaque utilisateur se voit attribuer 10 crédits d'essai à l'inscription. Des crédits supplémentaires peuvent être achetés via des abonnements mensuels/annuels ou des packs rechargeables sans expiration.
+              L'accès aux fonctionnalités d'exportation nécessite un compte utilisateur valide et l'utilisation de crédits. Chaque utilisateur se voit attribuer 10 crédits d'essai à l'inscription. Des crédits supplémentaires peuvent être achetés via des abonnements mensuels ou des packs rechargeables valables 30 jours après achat.
             </p>
           </div>
 

@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Layers, ShieldCheck, Zap, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Zap, AlertTriangle, AlertCircle, Server } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface VectorizerStats {
-  colorCount: number;
-  pathCount: number;
+  colorCount?: number;
+  pathCount?: number;
   durationMs: number;
-  width: number;
-  height: number;
+  engine?: string;
 }
 
 export default function VectorizerTool() {
@@ -27,7 +26,7 @@ export default function VectorizerTool() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLowRes, setIsLowRes] = useState(false);
-  const [isDtfPresetActive, setIsDtfPresetActive] = useState(true);
+  const [activeEngine, setActiveEngine] = useState<'potrace_server' | 'local_worker'>('potrace_server');
 
   // Parameters
   const [qualityMode, setQualityMode] = useState<'low' | 'medium' | 'high' | 'ultra'>('high');
@@ -38,7 +37,7 @@ export default function VectorizerTool() {
 
   const workerRef = useRef<Worker | null>(null);
 
-  // Initialize Web Worker
+  // Initialize Web Worker Fallback
   useEffect(() => {
     if (typeof window !== 'undefined') {
       workerRef.current = new Worker('/workers/vectorizer-worker.js');
@@ -47,7 +46,13 @@ export default function VectorizerTool() {
         setIsProcessing(false);
         if (e.data.success) {
           setVectorizedSvg(e.data.svg);
-          setStats(e.data.stats);
+          setStats({
+            colorCount: e.data.stats.colorCount,
+            pathCount: e.data.stats.pathCount,
+            durationMs: e.data.stats.durationMs,
+            engine: 'local_worker',
+          });
+          setActiveEngine('local_worker');
           setStatusMessage('');
         } else {
           setErrorMessage(e.data.error || 'Erreur lors de la vectorisation');
@@ -62,8 +67,44 @@ export default function VectorizerTool() {
     };
   }, []);
 
+  const fallbackToLocalWorker = useCallback((file: File) => {
+    setStatusMessage('Vectorisation secours Web Worker...');
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setIsProcessing(false);
+        setErrorMessage('Erreur canvas');
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      const scale = qualityMode === 'ultra' ? 4 : qualityMode === 'high' ? 2 : 1;
+
+      if (workerRef.current) {
+        workerRef.current.postMessage({
+          imageData,
+          width: img.width,
+          height: img.height,
+          options: { noiseFilter, minShapeSize, colorCount, curveSmoothing, scale, qualityMode },
+        });
+      } else {
+        setIsProcessing(false);
+        setErrorMessage('Vectoriseur indisponible');
+      }
+    };
+
+    img.src = objectUrl;
+  }, [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode]);
+
   const processVectorization = useCallback(
-    (file: File) => {
+    async (file: File) => {
       setErrorMessage(null);
       setIsLowRes(false);
 
@@ -78,62 +119,63 @@ export default function VectorizerTool() {
       }
 
       setIsProcessing(true);
-      setStatusMessage(t('vectorizer.analyzing'));
+      setStatusMessage('Vectorisation IA Potrace en cours sur nos serveurs...');
 
-      const img = new Image();
       const objectUrl = URL.createObjectURL(file);
       setOriginalPreviewUrl(objectUrl);
 
+      const img = new Image();
       img.onload = () => {
         if (img.width < 500 || img.height < 500) {
           setIsLowRes(true);
         }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          setIsProcessing(false);
-          setErrorMessage('Erreur d\'initialisation canvas');
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, img.width, img.height);
-
-        setStatusMessage(t('vectorizer.processing'));
-
-        const scale = qualityMode === 'ultra' ? 4 : qualityMode === 'high' ? 2 : 1;
-
-        if (workerRef.current) {
-          workerRef.current.postMessage({
-            imageData,
-            width: img.width,
-            height: img.height,
-            options: {
-              noiseFilter,
-              minShapeSize,
-              colorCount,
-              curveSmoothing,
-              scale,
-              qualityMode,
-            },
-          });
-        } else {
-          setIsProcessing(false);
-          setErrorMessage('Web Worker de vectorisation indisponible');
-        }
       };
-
       img.src = objectUrl;
+
+      // Try Server API route
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append(
+          'options',
+          JSON.stringify({
+            noiseFilter,
+            minShapeSize,
+            colorCount,
+            curveSmoothing,
+            scale: qualityMode === 'ultra' ? 4 : 2,
+          })
+        );
+
+        const res = await fetch('/api/vectorize', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        if (data.success && data.svg) {
+          setIsProcessing(false);
+          setVectorizedSvg(data.svg);
+          setStats({
+            durationMs: data.stats.durationMs,
+            engine: 'Potrace Python Server',
+          });
+          setActiveEngine('potrace_server');
+          setStatusMessage('');
+        } else {
+          console.warn('Server vectorization error, triggering fallback worker:', data.error);
+          fallbackToLocalWorker(file);
+        }
+      } catch (err) {
+        console.warn('Network error calling server vectorizer, triggering fallback worker:', err);
+        fallbackToLocalWorker(file);
+      }
     },
-    [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode, t]
+    [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode, fallbackToLocalWorker, t]
   );
 
   const applyDtfRecommendedPreset = () => {
-    setIsDtfPresetActive(true);
     setQualityMode('high');
     setNoiseFilter(2);
     setMinShapeSize(100);
@@ -146,7 +188,6 @@ export default function VectorizerTool() {
 
   const handleQualityPresetChange = (newMode: 'low' | 'medium' | 'high' | 'ultra') => {
     setQualityMode(newMode);
-    setIsDtfPresetActive(false);
 
     if (newMode === 'low') {
       setNoiseFilter(1);
@@ -204,7 +245,7 @@ export default function VectorizerTool() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `VXEL_Vector_DTF_${Date.now()}.svg`;
+    a.download = `VXEL_Potrace_DTF_${Date.now()}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -224,7 +265,7 @@ export default function VectorizerTool() {
       <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase mb-2">
-            <Zap className="w-3.5 h-3.5" /> Vectorisation DTF Anti-Bavures HD
+            <Server className="w-3.5 h-3.5" /> Vectorisation Potrace Server IA
           </div>
           <h2 className="text-2xl font-extrabold text-white">{t('vectorizer.title')}</h2>
           <p className="text-xs text-slate-400 mt-1">{t('vectorizer.sub')}</p>
@@ -281,7 +322,6 @@ export default function VectorizerTool() {
       {/* Advanced Parameters Drawer */}
       {showAdvanced && (
         <div className="bg-[#161616] border border-[#F7941D]/40 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* 1. Noise Filter */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-slate-300">{t('vectorizer.noiseFilterLabel')}</span>
@@ -293,16 +333,12 @@ export default function VectorizerTool() {
               max="3"
               step="1"
               value={noiseFilter}
-              onChange={(e) => {
-                setIsDtfPresetActive(false);
-                setNoiseFilter(parseInt(e.target.value));
-              }}
+              onChange={(e) => setNoiseFilter(parseInt(e.target.value))}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
-            <p className="text-[10px] text-slate-500">Élimine les bavures d'encre & contours flous DTF</p>
+            <p className="text-[10px] text-slate-500">Flou Gaussien OpenCV anti-bruit</p>
           </div>
 
-          {/* 2. Min Shape Size */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-slate-300">{t('vectorizer.minShapeSizeLabel')}</span>
@@ -314,16 +350,12 @@ export default function VectorizerTool() {
               max="300"
               step="10"
               value={minShapeSize}
-              onChange={(e) => {
-                setIsDtfPresetActive(false);
-                setMinShapeSize(parseInt(e.target.value));
-              }}
+              onChange={(e) => setMinShapeSize(parseInt(e.target.value))}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
-            <p className="text-[10px] text-slate-500">Filtre les micro-artefacts d'impression</p>
+            <p className="text-[10px] text-slate-500">Turdsize Potrace (min. surface shape)</p>
           </div>
 
-          {/* 3. Color Count */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-slate-300">{t('vectorizer.colorCountLabel')}</span>
@@ -335,16 +367,12 @@ export default function VectorizerTool() {
               max="64"
               step="2"
               value={colorCount}
-              onChange={(e) => {
-                setIsDtfPresetActive(false);
-                setColorCount(parseInt(e.target.value));
-              }}
+              onChange={(e) => setColorCount(parseInt(e.target.value))}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
-            <p className="text-[10px] text-slate-500">Quantification des aplats de couleur</p>
+            <p className="text-[10px] text-slate-500">Quantification K-Means</p>
           </div>
 
-          {/* 4. Curve Smoothing */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-slate-300">{t('vectorizer.curveSmoothingLabel')}</span>
@@ -356,13 +384,10 @@ export default function VectorizerTool() {
               max="4.0"
               step="0.1"
               value={curveSmoothing}
-              onChange={(e) => {
-                setIsDtfPresetActive(false);
-                setCurveSmoothing(parseFloat(e.target.value));
-              }}
+              onChange={(e) => setCurveSmoothing(parseFloat(e.target.value))}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
-            <p className="text-[10px] text-slate-500">Lissage Bézier des tracés vectoriels</p>
+            <p className="text-[10px] text-slate-500">Alphamax Potrace (Bézier smoothing)</p>
           </div>
 
           {originalFile && (
@@ -430,9 +455,8 @@ export default function VectorizerTool() {
 
               {stats && (
                 <div className="flex items-center gap-3 text-xs text-slate-300 font-mono">
-                  <span>🎨 {t('vectorizer.statsColors')} <strong className="text-white">{stats.colorCount}</strong></span>
-                  <span>📏 {t('vectorizer.statsPaths')} <strong className="text-[#F7941D]">{stats.pathCount.toLocaleString()}</strong></span>
-                  <span>⚡ {t('vectorizer.statsTime')} <strong className="text-white">{stats.durationMs}ms</strong></span>
+                  <span>⚡ Moteur : <strong className="text-[#F7941D]">{stats.engine || 'Potrace'}</strong></span>
+                  <span>⏱️ Temps : <strong className="text-white">{stats.durationMs}ms</strong></span>
                 </div>
               )}
             </div>
@@ -462,7 +486,7 @@ export default function VectorizerTool() {
           {isProcessing && (
             <div className="bg-[#F7941D]/10 border border-[#F7941D] text-[#F7941D] p-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 animate-pulse">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>{statusMessage || t('vectorizer.processing')}</span>
+              <span>{statusMessage || 'Vectorisation IA en cours...'}</span>
             </div>
           )}
 
@@ -485,13 +509,13 @@ export default function VectorizerTool() {
               </div>
             </div>
 
-            {/* Après (SVG Vectoriel HD) */}
+            {/* Après (SVG Potrace HD) */}
             <div className="bg-[#161616] border border-[#F7941D]/50 rounded-3xl p-4 flex flex-col justify-between space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
                 <span className="text-xs font-extrabold uppercase text-[#F7941D] tracking-wider">
                   ⚡ {t('vectorizer.after')}
                 </span>
-                <span className="text-[10px] text-green-400 font-mono font-bold">Vectoriel Clean Bézier</span>
+                <span className="text-[10px] text-green-400 font-mono font-bold">Potrace Server HD</span>
               </div>
 
               <div
@@ -511,7 +535,7 @@ export default function VectorizerTool() {
                   />
                 ) : (
                   <div className="text-xs text-slate-500 font-mono animate-pulse">
-                    Génération des tracés vectoriels...
+                    Génération des tracés vectoriels Potrace...
                   </div>
                 )}
               </div>
