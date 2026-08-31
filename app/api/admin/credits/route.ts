@@ -11,10 +11,11 @@ export async function POST(req: Request) {
     }
 
     await connectDB();
-    const { clerkId, amount, action } = await req.json();
+    const body = await req.json();
+    const { clerkId, amount, action, creditsToAdd, creditsExact } = body;
 
-    if (!clerkId || typeof amount !== 'number') {
-      return NextResponse.json({ success: false, error: 'Paramètres clerkId ou amount invalides' }, { status: 400 });
+    if (!clerkId) {
+      return NextResponse.json({ success: false, error: 'Paramètre clerkId manquant' }, { status: 400 });
     }
 
     let user = await User.findOne({ clerkId });
@@ -26,21 +27,25 @@ export async function POST(req: Request) {
       });
     }
 
-    if (action === 'set') {
-      user.credits = Math.max(0, amount);
+    // Determine target calculation
+    if (typeof creditsExact === 'number' || action === 'set') {
+      const targetVal = typeof creditsExact === 'number' ? creditsExact : amount;
+      user.credits = Math.max(0, targetVal);
     } else {
-      // Default: add
-      user.credits = Math.max(0, (user.credits || 0) + amount);
+      // Default: add creditsToAdd or amount
+      const addVal = typeof creditsToAdd === 'number' ? creditsToAdd : (typeof amount === 'number' ? amount : 10);
+      user.credits = Math.max(0, (user.credits || 0) + addVal);
     }
 
     await user.save();
 
-    console.log(`[AdminAPI] Crédits mis à jour pour ${clerkId} : ${user.credits} (action: ${action || 'add'}, val: ${amount})`);
+    console.log(`[AdminAPI] Crédits mis à jour pour ${clerkId} : ${user.credits} (compte: ${user.email})`);
 
     return NextResponse.json({
       success: true,
       credits: user.credits,
-      message: `Crédits mis à jour avec succès : ${user.credits} crédits`,
+      userEmail: user.email,
+      message: `✅ Crédits mis à jour avec succès pour ${user.email} (nouveau solde : ${user.credits} crédits)`,
     });
   } catch (error: any) {
     console.error('Erreur API Admin Credits :', error);

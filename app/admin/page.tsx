@@ -20,13 +20,11 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  ExternalLink,
   RefreshCw,
-  Ban,
-  Check,
   Zap,
   ArrowLeft,
   FileSpreadsheet,
+  ZapOff,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'contact.tbalbiza@gmail.com';
@@ -83,7 +81,7 @@ export default function AdminPage() {
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => setNotification(null), 3500);
   };
 
   // Inspect email connected via Clerk
@@ -140,18 +138,27 @@ export default function AdminPage() {
     }
   }, [isAdmin, fetchUsers, fetchProjects]);
 
-  // Credit Actions (Add / Set)
-  const handleUpdateCredits = async (clerkId: string, action: 'add' | 'set') => {
-    const val = creditInputValues[clerkId] || 10;
+  // Flexible Credit Actions (creditsToAdd or creditsExact, plus +100 quick button)
+  const handleUpdateCredits = async (userRecord: UserRecord, type: 'add' | 'exact' | 'quick100') => {
+    const val = type === 'quick100' ? 100 : creditInputValues[userRecord.clerkId] ?? 10;
+    const payload =
+      type === 'exact'
+        ? { clerkId: userRecord.clerkId, creditsExact: val }
+        : { clerkId: userRecord.clerkId, creditsToAdd: val };
+
     try {
       const res = await fetch('/api/admin/credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clerkId, amount: val, action }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || `Crédits ${action === 'set' ? 'définis' : 'ajoutés'} avec succès !`);
+        const msg =
+          type === 'exact'
+            ? `✅ Solde défini à ${data.credits} crédits pour ${userRecord.email}`
+            : `✅ ${val} crédits ajoutés à ${userRecord.email}`;
+        showToast(msg);
         fetchUsers();
       } else {
         showToast(data.error || 'Erreur lors de la mise à jour des crédits', 'error');
@@ -421,9 +428,9 @@ export default function AdminPage() {
                   <tr className="border-b border-[#2E2E2E] text-slate-400 uppercase font-mono text-[10px]">
                     <th className="py-3 px-4">Utilisateur / Email</th>
                     <th className="py-3 px-4">Clerk ID</th>
-                    <th className="py-3 px-4">Crédits Actuels</th>
+                    <th className="py-3 px-4">Solde Actuel</th>
                     <th className="py-3 px-4">Gestion Flexible des Crédits</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3 px-4 text-right">Actions Statut</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2E2E2E]/60">
@@ -448,13 +455,13 @@ export default function AdminPage() {
                               {u.credits} crédits
                             </span>
                           </td>
-                          {/* Input Numérique + Ajouter + Définir */}
+                          {/* Système Flexible : Input Numérique + Ajouter + +100 Rapide + Définir */}
                           <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <input
                                 type="number"
                                 min="1"
-                                max="10000"
+                                defaultValue="10"
                                 value={inputVal}
                                 onChange={(e) =>
                                   setCreditInputValues((prev) => ({
@@ -466,16 +473,24 @@ export default function AdminPage() {
                               />
 
                               <button
-                                onClick={() => handleUpdateCredits(u.clerkId, 'add')}
-                                className="px-3 py-1.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs flex items-center gap-1 shadow-md shadow-[#F7941D]/20"
+                                onClick={() => handleUpdateCredits(u, 'add')}
+                                className="px-3 py-1.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs flex items-center gap-1 shadow-md shadow-[#F7941D]/20 transition-transform active:scale-95"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>{t('adminPage.users.addCredits')}</span>
                               </button>
 
                               <button
-                                onClick={() => handleUpdateCredits(u.clerkId, 'set')}
-                                className="px-3 py-1.5 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1"
+                                onClick={() => handleUpdateCredits(u, 'quick100')}
+                                title="Ajouter rapidement +100 crédits"
+                                className="px-2.5 py-1.5 bg-[#2A1A05] border border-[#F7941D]/60 hover:bg-[#F7941D] hover:text-black text-[#F7941D] font-extrabold rounded-xl text-xs transition-all"
+                              >
+                                +100
+                              </button>
+
+                              <button
+                                onClick={() => handleUpdateCredits(u, 'exact')}
+                                className="px-3 py-1.5 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1 transition-all"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                                 <span>{t('adminPage.users.setCredits')}</span>

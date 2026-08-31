@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { UserButton, useUser, SignInButton, SignUpButton } from '@clerk/nextjs';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Layers, Wand2, Zap, CreditCard, Mail, Menu, X } from 'lucide-react';
+import { Layers, Wand2, Zap, CreditCard, Mail, Menu, X, Settings } from 'lucide-react';
+
+const ADMIN_EMAIL = 'contact.tbalbiza@gmail.com';
 
 interface HeaderProps {
   onOpenContact?: () => void;
@@ -16,6 +18,10 @@ export default function Header({ onOpenContact }: HeaderProps) {
   const { user, isSignedIn } = useUser();
   const [credits, setCredits] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Inspect email for conditional admin link
+  const userEmail = user?.emailAddresses.find((e) => e.id === user?.primaryEmailAddressId)?.emailAddress || user?.emailAddresses[0]?.emailAddress || '';
+  const isAdmin = isSignedIn && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   useEffect(() => {
     if (isSignedIn && user) {
@@ -67,6 +73,17 @@ export default function Header({ onOpenContact }: HeaderProps) {
               <Mail className="w-3.5 h-3.5" />
               <span>Contact</span>
             </button>
+          )}
+
+          {/* Conditional Admin Link (Only for contact.tbalbiza@gmail.com) */}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="px-3 py-1 bg-[#F7941D]/10 border border-[#F7941D]/40 text-[#F7941D] hover:bg-[#F7941D] hover:text-black rounded-xl font-extrabold transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>⚙️ Admin</span>
+            </Link>
           )}
         </nav>
 
@@ -127,6 +144,17 @@ export default function Header({ onOpenContact }: HeaderProps) {
           <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2">
             {t('common.viewPricing')}
           </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-[#F7941D] font-extrabold border-t border-[#2E2E2E] pt-3 flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              <span>⚙️ Admin Back-Office</span>
+            </Link>
+          )}
         </div>
       )}
     </header>

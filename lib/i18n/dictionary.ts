@@ -32,6 +32,7 @@ export const dictionary: Record<Language, Record<string, any>> = {
       pricing: 'Tarifs',
       tryTool: 'Accéder aux outils',
       imageToVector: 'Image to Vector',
+      admin: '⚙️ Admin',
     },
     hero: {
       badge: 'Plateforme SaaS B2B VXEL DTF Studio Pro',
@@ -166,11 +167,15 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     adminPage: {
       title: 'Back-Office Administrateur VXEL',
+      link: '⚙️ Admin',
       accessDenied: '⛔ Accès Refusé',
       accessDeniedMsg: 'Seul l\'administrateur autorisé (contact.tbalbiza@gmail.com) peut accéder à cette interface.',
       backHome: 'Retour à l\'accueil',
       searchPlaceholder: 'Rechercher par email, fichier ou utilisateur...',
       exportCSV: '📥 Exporter CSV',
+      addCredits: 'Ajouter',
+      setCredits: 'Définir',
+      creditsAmount: 'Montant crédits',
       tabs: {
         users: '👥 Utilisateurs',
         projects: '📂 Travaux Réalisés',
@@ -289,6 +294,7 @@ export const dictionary: Record<Language, Record<string, any>> = {
       pricing: 'Pricing',
       tryTool: 'Access Tools',
       imageToVector: 'Image to Vector',
+      admin: '⚙️ Admin',
     },
     hero: {
       badge: 'VXEL DTF Studio Pro B2B SaaS Platform',
@@ -423,11 +429,15 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     adminPage: {
       title: 'VXEL Administrator Back-Office',
+      link: '⚙️ Admin',
       accessDenied: '⛔ Access Denied',
       accessDeniedMsg: 'Only authorized administrator (contact.tbalbiza@gmail.com) can access this area.',
       backHome: 'Back to Home',
       searchPlaceholder: 'Search by email, file or user...',
       exportCSV: '📥 Export CSV',
+      addCredits: 'Add',
+      setCredits: 'Set',
+      creditsAmount: 'Credits Amount',
       tabs: {
         users: '👥 Users',
         projects: '📂 Completed Projects',
@@ -546,6 +556,7 @@ export const dictionary: Record<Language, Record<string, any>> = {
       pricing: 'Precios',
       tryTool: 'Acceder a herramientas',
       imageToVector: 'Image to Vector',
+      admin: '⚙️ Admin',
     },
     hero: {
       badge: 'Plataforma SaaS B2B VXEL DTF Studio Pro',
@@ -680,11 +691,15 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     adminPage: {
       title: 'Back-Office Administrador VXEL',
+      link: '⚙️ Admin',
       accessDenied: '⛔ Acceso Denegado',
       accessDeniedMsg: 'Solo el administrador autorizado (contact.tbalbiza@gmail.com) puede acceder a esta interfaz.',
       backHome: 'Volver al Inicio',
       searchPlaceholder: 'Buscar por email, archivo o usuario...',
       exportCSV: '📥 Exportar CSV',
+      addCredits: 'Añadir',
+      setCredits: 'Definir',
+      creditsAmount: 'Monto créditos',
       tabs: {
         users: '👥 Usuarios',
         projects: '📂 Trabajos Realizados',
