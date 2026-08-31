@@ -1,33 +1,49 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { addCredits } from '@/lib/credits';
+import connectDB from '@/lib/db';
+import User from '@/models/User';
+import { verifyAdminServer } from '@/lib/admin-auth';
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    const authCheck = await verifyAdminServer();
+    if (!authCheck.authorized) {
+      return NextResponse.json({ success: false, error: authCheck.error }, { status: authCheck.status || 403 });
     }
 
-    const clerkUser = await currentUser();
-    const email = clerkUser?.emailAddresses?.[0]?.emailAddress || '';
+    await connectDB();
+    const { clerkId, amount, action } = await req.json();
 
-    if (email !== 'contact.tbalbiza@gmail.com' && email !== 'contact@vexel.com') {
-      return NextResponse.json({ success: false, error: 'Accès non autorisé' }, { status: 403 });
+    if (!clerkId || typeof amount !== 'number') {
+      return NextResponse.json({ success: false, error: 'Paramètres clerkId ou amount invalides' }, { status: 400 });
     }
 
-    const body = await req.json();
-    const { clerkId: targetClerkId, amount } = body;
-
-    if (!targetClerkId || typeof amount !== 'number') {
-      return NextResponse.json({ success: false, error: 'Paramètres invalides' }, { status: 400 });
+    let user = await User.findOne({ clerkId });
+    if (!user) {
+      user = await User.create({
+        clerkId,
+        email: 'user@vexel.dtf',
+        credits: 0,
+      });
     }
 
-    const newCredits = await addCredits(targetClerkId, amount);
+    if (action === 'set') {
+      user.credits = Math.max(0, amount);
+    } else {
+      // Default: add
+      user.credits = Math.max(0, (user.credits || 0) + amount);
+    }
 
-    return NextResponse.json({ success: true, credits: newCredits });
-  } catch (e: any) {
-    console.error('Erreur API admin/credits:', e);
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+    await user.save();
+
+    console.log(`[AdminAPI] Crédits mis à jour pour ${clerkId} : ${user.credits} (action: ${action || 'add'}, val: ${amount})`);
+
+    return NextResponse.json({
+      success: true,
+      credits: user.credits,
+      message: `Crédits mis à jour avec succès : ${user.credits} crédits`,
+    });
+  } catch (error: any) {
+    console.error('Erreur API Admin Credits :', error);
+    return NextResponse.json({ success: false, error: error.message || 'Erreur serveur' }, { status: 500 });
   }
 }

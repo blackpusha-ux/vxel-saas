@@ -1,43 +1,87 @@
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { connectDB } from '@/lib/db';
+import connectDB from '@/lib/db';
 import Project from '@/models/Project';
-import User from '@/models/User';
+import { verifyAdminServer } from '@/lib/admin-auth';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    const authCheck = await verifyAdminServer();
+    if (!authCheck.authorized) {
+      return NextResponse.json({ success: false, error: authCheck.error }, { status: authCheck.status || 403 });
     }
-
-    const clerkUser = await currentUser();
-    const email = clerkUser?.emailAddresses?.[0]?.emailAddress || '';
-    const isAdmin = email === 'contact.tbalbiza@gmail.com' || email === 'contact@vexel.com';
 
     await connectDB();
 
-    // If Admin, list all projects. If normal user, list only their projects.
-    const query = isAdmin ? {} : { clerkId: userId };
-    const projects = await Project.find(query).sort({ createdAt: -1 }).limit(50).lean();
+    const { searchParams } = new URL(req.url);
+    const toolType = searchParams.get('toolType');
+    const search = searchParams.get('search');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    // Map user emails if admin
-    const usersMap: Record<string, string> = {};
-    if (isAdmin) {
-      const users = await User.find({}, 'clerkId email').lean();
-      users.forEach((u: any) => {
-        usersMap[u.clerkId] = u.email;
-      });
+    const query: Record<string, any> = {};
+
+    if (toolType && toolType !== 'all') {
+      query.toolType = toolType;
     }
 
-    const formattedProjects = projects.map((p: any) => ({
-      ...p,
-      userEmail: usersMap[p.clerkId] || (p.clerkId === userId ? email : p.clerkId),
-    }));
+    if (search) {
+      query.$or = [
+        { userEmail: { $regex: search, $options: 'i' } },
+        { originalFileName: { $regex: search, $options: 'i' } },
+        { processedFileName: { $regex: search, $options: 'i' } },
+      ];
+    }
 
-    return NextResponse.json({ success: true, projects: formattedProjects });
-  } catch (e: any) {
-    console.error('Erreur API admin/projects:', e);
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+    const total = await Project.countDocuments(query);
+    const projects = await Project.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    return NextResponse.json({
+      success: true,
+      projects,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('Erreur API Admin GET Projects :', error);
+    return NextResponse.json({ success: false, error: error.message || 'Erreur serveur' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const authCheck = await verifyAdminServer();
+    if (!authCheck.authorized) {
+      return NextResponse.json({ success: false, error: authCheck.error }, { status: authCheck.status || 403 });
+    }
+
+    await connectDB();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Identifiant de projet manquant' }, { status: 400 });
+    }
+
+    const deleted = await Project.findByIdAndDelete(id);
+    if (!deleted) {
+      return NextResponse.json({ success: false, error: 'Projet non trouvé' }, { status: 404 });
+    }
+
+    console.log(`[AdminAPI] Projet supprimé : ${id}`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Projet supprimé avec succès',
+    });
+  } catch (error: any) {
+    console.error('Erreur API Admin DELETE Project :', error);
+    return NextResponse.json({ success: false, error: error.message || 'Erreur serveur' }, { status: 500 });
   }
 }

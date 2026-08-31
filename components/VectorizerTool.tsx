@@ -49,6 +49,19 @@ export default function VectorizerTool() {
             durationMs: e.data.stats.durationMs,
             engine: 'Vectorisation IA HD',
           });
+
+          // Save project record in MongoDB
+          fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toolType: 'vectorizer',
+              originalFileName: originalFile ? originalFile.name : 'visuel-source.png',
+              processedFileName: `VXEL_ImageToVector_${Date.now()}.svg`,
+              status: 'completed',
+              creditsUsed: 1,
+            }),
+          }).catch(() => {});
         } else {
           setErrorMessage(e.data.error || 'Erreur lors de la conversion Image to Vector');
         }
@@ -60,7 +73,7 @@ export default function VectorizerTool() {
         workerRef.current.terminate();
       }
     };
-  }, []);
+  }, [originalFile]);
 
   const runVectorization = useCallback((file: File, colorsCountVal?: number, noiseVal?: number, precVal?: number) => {
     setErrorMessage(null);
