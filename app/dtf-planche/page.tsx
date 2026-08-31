@@ -3,18 +3,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer, FileText, Image as ImageIcon, Layers, FileCode, Check, X } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
 import { generateDTXFile } from '@/lib/dtf-export';
+import ExportFormatModal, { PlancheFormatOption } from '@/components/ExportFormatModal';
+import { DTFMachineItem } from '@/lib/dtf-machines';
 
 interface QueueItem {
   src: string;
   w: number;
   h: number;
 }
-
-export type PlancheExportFormat = 'PDF' | 'PNG' | 'TIFF' | 'DTX';
 
 export default function DTFPlanchePage() {
   const { t } = useTranslation();
@@ -26,9 +26,8 @@ export default function DTFPlanchePage() {
   const [previewDimensions, setPreviewDimensions] = useState<string>('—');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Modal State for 4 Export Formats
+  // Modal State for Machine-Guided Export
   const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState<PlancheExportFormat>('PDF');
 
   // Upload handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,14 +139,40 @@ export default function DTFPlanchePage() {
     setShowExportModal(true);
   };
 
-  const handleExecuteExport = () => {
+  // Helper wrapper for DTX compatibility
+  const generateDTXWrapper = (pdfBlob: Blob, fileName: string) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const pdfArrayBuffer = e.target?.result as ArrayBuffer;
+      const headerText = `DTX_V2\nDIMENSIONS:${machineWidth}x${previewDimensions}\nDPI:1440\nCHANNELS:CMYK+WHITE\n---\n`;
+      const headerEncoder = new TextEncoder();
+      const headerBytes = headerEncoder.encode(headerText);
+
+      const dtxBuffer = new Uint8Array(headerBytes.length + pdfArrayBuffer.byteLength);
+      dtxBuffer.set(headerBytes, 0);
+      dtxBuffer.set(new Uint8Array(pdfArrayBuffer), headerBytes.length);
+
+      const dtxBlob = new Blob([dtxBuffer.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(dtxBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    reader.readAsArrayBuffer(pdfBlob);
+  };
+
+  const handleConfirmExport = (format: PlancheFormatOption, machine: DTFMachineItem | null) => {
     if (printQueue.length === 0 || !canvasRef.current) return;
 
     const layout = calculateLayout();
     const { positions, realHeightCm } = layout;
     const canvas = canvasRef.current;
 
-    if (selectedFormat === 'PDF') {
+    const baseFileName = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm_${machine ? machine.id : 'custom'}`;
+
+    if (format === 'PDF') {
       const doc = new jsPDF({
         orientation: 'p',
         unit: 'cm',
@@ -156,38 +181,50 @@ export default function DTFPlanchePage() {
       positions.forEach((pos) => {
         doc.addImage(pos.src, 'PNG', pos.x, pos.y, pos.w, pos.h);
       });
-      doc.save(`VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.pdf`);
-    } else if (selectedFormat === 'PNG') {
+      doc.save(`${baseFileName}.pdf`);
+    } else if (format === 'PNG') {
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.png`;
+      a.download = `${baseFileName}.png`;
       a.click();
-    } else if (selectedFormat === 'TIFF') {
+    } else if (format === 'TIFF') {
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.tiff`;
+      a.download = `${baseFileName}.tiff`;
       a.click();
-    } else if (selectedFormat === 'DTX') {
-      // Native DTX v2 Binary Export
-      const dtxBytes = generateDTXFile(canvas, {
-        widthCm: machineWidth,
-        heightCm: realHeightCm,
-        dpi: 1440,
-        pressTempC: 160,
-        pressDurationSec: 15,
-      });
-      const blob = new Blob([dtxBytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.dtx`;
-      a.click();
-      URL.revokeObjectURL(url);
+    } else if (format === 'DTX') {
+      // Direct Native DTX Binary Generation
+      try {
+        const dtxBytes = generateDTXFile(canvas, {
+          widthCm: machineWidth,
+          heightCm: realHeightCm,
+          dpi: 1440,
+          pressTempC: 160,
+          pressDurationSec: 15,
+        });
+        const blob = new Blob([dtxBytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseFileName}.dtx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        // Fallback to DTX Header Wrapper over PDF if binary canvas fails
+        const doc = new jsPDF({
+          orientation: 'p',
+          unit: 'cm',
+          format: [machineWidth, realHeightCm],
+        });
+        positions.forEach((pos) => {
+          doc.addImage(pos.src, 'PNG', pos.x, pos.y, pos.w, pos.h);
+        });
+        const pdfBlob = doc.output('blob');
+        generateDTXWrapper(pdfBlob, `${baseFileName}.dtx`);
+      }
     }
-
-    setShowExportModal(false);
   };
 
   return (
@@ -303,127 +340,19 @@ export default function DTFPlanchePage() {
                 <Trash2 className="w-3 h-3" /> {t('planchePage.clearQueueBtn')}
               </button>
               <button onClick={handleOpenExportModal} className="tb-btn-primary py-2.5 rounded text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1 font-bold">
-                <Download className="w-4 h-4" /> {t('planche.export.download')}
+                <Download className="w-4 h-4" /> Télécharger Planche DTF
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Export Modal with 4 Formats (PDF, PNG, TIFF, DTX) */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-4">
-              <div>
-                <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-                  <Download className="w-5 h-5 text-[#F7941D]" /> Choisir le Format d'Exportation DTF
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Sélectionnez le format adapté à votre imprimante ou RIP</p>
-              </div>
-              <button onClick={() => setShowExportModal(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#222]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {/* PDF Option */}
-              <div
-                onClick={() => setSelectedFormat('PDF')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  selectedFormat === 'PDF' ? 'bg-[#0A0A0A] border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E] hover:border-slate-500'
-                }`}
-              >
-                <div className="w-10 h-10 bg-blue-950/80 text-blue-300 rounded-xl flex items-center justify-center border border-blue-700/60 flex-shrink-0">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">PDF Vectoriel 300 DPI</h4>
-                  <p className="text-xs text-slate-400">Format universel accepté par 99% des imprimantes et RIP.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedFormat === 'PDF' ? 'border-[#F7941D] bg-[#F7941D]' : 'border-[#2E2E2E]'}`}>
-                  {selectedFormat === 'PDF' && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                </div>
-              </div>
-
-              {/* PNG Option */}
-              <div
-                onClick={() => setSelectedFormat('PNG')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  selectedFormat === 'PNG' ? 'bg-[#0A0A0A] border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E] hover:border-slate-500'
-                }`}
-              >
-                <div className="w-10 h-10 bg-green-950/80 text-green-300 rounded-xl flex items-center justify-center border border-green-700/60 flex-shrink-0">
-                  <ImageIcon className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">PNG HD 300 DPI Transparent</h4>
-                  <p className="text-xs text-slate-400">Format raster avec couche transparente pour impression directe.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedFormat === 'PNG' ? 'border-[#F7941D] bg-[#F7941D]' : 'border-[#2E2E2E]'}`}>
-                  {selectedFormat === 'PNG' && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                </div>
-              </div>
-
-              {/* TIFF Option */}
-              <div
-                onClick={() => setSelectedFormat('TIFF')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  selectedFormat === 'TIFF' ? 'bg-[#0A0A0A] border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E] hover:border-slate-500'
-                }`}
-              >
-                <div className="w-10 h-10 bg-amber-950/80 text-amber-300 rounded-xl flex items-center justify-center border border-amber-700/60 flex-shrink-0">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white">TIFF Uncompressed (RIP Pro)</h4>
-                  <p className="text-xs text-slate-400">Format haute qualité sans perte pour logiciels RIP professionnels.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedFormat === 'TIFF' ? 'border-[#F7941D] bg-[#F7941D]' : 'border-[#2E2E2E]'}`}>
-                  {selectedFormat === 'TIFF' && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                </div>
-              </div>
-
-              {/* DTX Option */}
-              <div
-                onClick={() => setSelectedFormat('DTX')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  selectedFormat === 'DTX' ? 'bg-[#0A0A0A] border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E] hover:border-slate-500'
-                }`}
-              >
-                <div className="w-10 h-10 bg-purple-950/80 text-purple-300 rounded-xl flex items-center justify-center border border-purple-700/60 flex-shrink-0">
-                  <FileCode className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    DTX Natif v2
-                    <span className="px-2 py-0.5 bg-purple-950/80 text-purple-300 border border-purple-700/60 text-[10px] font-extrabold rounded-full">
-                      Natif DTF
-                    </span>
-                  </h4>
-                  <p className="text-xs text-slate-400">Pour machines Coldeso, Prestige & UniHeat avec couche blanche intégrée.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedFormat === 'DTX' ? 'border-[#F7941D] bg-[#F7941D]' : 'border-[#2E2E2E]'}`}>
-                  {selectedFormat === 'DTX' && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#2E2E2E]">
-              <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white">
-                Annuler
-              </button>
-              <button
-                onClick={handleExecuteExport}
-                className="px-6 py-2.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-xs rounded-xl shadow-lg shadow-[#F7941D]/20 flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Télécharger la planche ({selectedFormat})</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Export Format Modal with Printer Selector */}
+      <ExportFormatModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onConfirmExport={handleConfirmExport}
+      />
     </div>
   );
 }

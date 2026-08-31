@@ -200,13 +200,17 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     planche: {
       export: {
-        format: 'Format d\'exportation',
-        selectFormat: 'Sélectionnez le format d\'exportation DTF',
-        pdf: 'PDF Vectoriel (Format Universel 99% des machines)',
-        png: 'PNG HD 300 DPI Transparent (Image Raster)',
-        tiff: 'TIFF Uncompressed (Haute Qualité RIP)',
-        dtx: 'DTX Natif v2 (Machines Coldeso, Prestige, UniHeat)',
-        download: 'Télécharger la planche',
+        title: "Choisir le format d'export",
+        selectMachine: "Sélectionnez votre machine DTF",
+        otherMachine: "Autre machine / Format manuel",
+        recommended: "Recommandé",
+        formats: {
+          pdf: "PDF (Universel)",
+          png: "PNG HD 300 DPI",
+          tiff: "TIFF (Haute Qualité)",
+          dtx: "DTX (Format Natif)",
+        },
+        download: "Télécharger la planche",
       },
       machines: {
         title: 'Machines DTF Compatibles',
@@ -444,13 +448,17 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     planche: {
       export: {
-        format: 'Export Format',
-        selectFormat: 'Select DTF Export Format',
-        pdf: 'Vector PDF (Universal 99% Printers)',
-        png: 'HD 300 DPI Transparent PNG (Raster)',
-        tiff: 'TIFF Uncompressed (High Quality RIP)',
-        dtx: 'Native DTX v2 (Coldeso, Prestige, UniHeat)',
-        download: 'Download Gang Sheet',
+        title: "Choose Export Format",
+        selectMachine: "Select your DTF Printer",
+        otherMachine: "Other Printer / Manual Format",
+        recommended: "Recommended",
+        formats: {
+          pdf: "PDF (Universal)",
+          png: "HD 300 DPI PNG",
+          tiff: "TIFF (High Quality)",
+          dtx: "DTX (Native Format)",
+        },
+        download: "Download Gang Sheet",
       },
       machines: {
         title: 'Compatible DTF Printers',
@@ -688,13 +696,17 @@ export const dictionary: Record<Language, Record<string, any>> = {
     },
     planche: {
       export: {
-        format: 'Formato de Exportación',
-        selectFormat: 'Seleccione formato de exportación DTF',
-        pdf: 'PDF Vectorial (Formato Universal 99% impresoras)',
-        png: 'PNG HD 300 DPI Transparente (Imagen Raster)',
-        tiff: 'TIFF Uncompressed (Alta Calidad RIP)',
-        dtx: 'DTX Nativo v2 (Coldeso, Prestige, UniHeat)',
-        download: 'Descargar Planche',
+        title: "Elegir formato de exportación",
+        selectMachine: "Seleccione su impresora DTF",
+        otherMachine: "Otra impresora / Formato manual",
+        recommended: "Recomendado",
+        formats: {
+          pdf: "PDF (Universal)",
+          png: "PNG HD 300 DPI",
+          tiff: "TIFF (Alta Calidad)",
+          dtx: "DTX (Formato Nativo)",
+        },
+        download: "Descargar Planche",
       },
       machines: {
         title: 'Impresoras DTF Compatibles',
