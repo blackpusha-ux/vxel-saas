@@ -3,9 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer, Info, Check, Star } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
+import { dtfMachinesDatabase, DTFMachine } from '@/lib/dtf-machines';
+import MachineCompatibilityModal from '@/components/MachineCompatibilityModal';
+import ExportFormatModal, { ExportFormat } from '@/components/ExportFormatModal';
+import { generateDTXFile } from '@/lib/dtf-export';
 
 interface QueueItem {
   src: string;
@@ -23,11 +27,16 @@ export default function DTFPlanchePage() {
   const [previewDimensions, setPreviewDimensions] = useState<string>('—');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Machine Selection & Export Modals
+  const [selectedMachine, setSelectedMachine] = useState<DTFMachine | null>(dtfMachinesDatabase[0]);
+  const [showMachineModal, setShowMachineModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+
   // Chargement multiple d'images
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    
+
     for (const file of files) {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -62,21 +71,21 @@ export default function DTFPlanchePage() {
     let currentY_cm = gutterCm;
     let maxHeightInRow_cm = 0;
     const positions: (QueueItem & { x: number; y: number })[] = [];
-    
+
     for (let i = 0; i < printQueue.length; i++) {
       const item = printQueue[i];
-      
+
       if ((currentX_cm + item.w) > (machineWidth - gutterCm)) {
         currentX_cm = gutterCm;
         currentY_cm += maxHeightInRow_cm + gutterCm;
         maxHeightInRow_cm = 0;
       }
-      
+
       positions.push({ ...item, x: currentX_cm, y: currentY_cm });
       currentX_cm += item.w + gutterCm;
       if (item.h > maxHeightInRow_cm) maxHeightInRow_cm = item.h;
     }
-    
+
     const realHeightCm = currentY_cm + maxHeightInRow_cm + gutterCm;
     return { positions, realHeightCm };
   };
@@ -94,19 +103,19 @@ export default function DTFPlanchePage() {
 
     const layout = calculateLayout();
     const { positions, realHeightCm } = layout;
-    
-    const scaleFactor = 500 / machineWidth; 
+
+    const scaleFactor = 500 / machineWidth;
     const canvasW = Math.round(machineWidth * scaleFactor);
     const canvasH = Math.round(realHeightCm * scaleFactor);
-    
+
     canvas.width = canvasW;
     canvas.height = canvasH;
-    
+
     setPreviewDimensions(`${machineWidth}cm × ${realHeightCm.toFixed(1)}cm`);
-    
+
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     positions.forEach((pos) => {
       const img = new Image();
       img.onload = () => {
@@ -114,9 +123,9 @@ export default function DTFPlanchePage() {
         const drawY = pos.y * scaleFactor;
         const drawW = pos.w * scaleFactor;
         const drawH = pos.h * scaleFactor;
-        
+
         ctx.drawImage(img, drawX, drawY, drawW, drawH);
-        
+
         ctx.strokeStyle = '#F7941D';
         ctx.lineWidth = 2;
         ctx.strokeRect(drawX, drawY, drawW, drawH);
@@ -125,26 +134,66 @@ export default function DTFPlanchePage() {
     });
   }, [printQueue, tagWidth, tagHeight, machineWidth, gutterSize]);
 
-  const downloadPDF = () => {
+  const handleOpenExport = () => {
     if (printQueue.length === 0) {
       alert(t('planchePage.alertEmptyQueue'));
       return;
     }
+    setShowExportModal(true);
+  };
+
+  const handleConfirmExport = (format: ExportFormat) => {
+    if (printQueue.length === 0 || !canvasRef.current) return;
 
     const layout = calculateLayout();
     const { positions, realHeightCm } = layout;
-    
-    const doc = new jsPDF({ 
-      orientation: 'p', 
-      unit: 'cm', 
-      format: [machineWidth, realHeightCm] 
-    });
-    
-    positions.forEach((pos) => {
-      doc.addImage(pos.src, 'PNG', pos.x, pos.y, pos.w, pos.h);
-    });
+    const canvas = canvasRef.current;
 
-    doc.save(`VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.pdf`);
+    if (format === 'PDF') {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'cm',
+        format: [machineWidth, realHeightCm],
+      });
+      positions.forEach((pos) => {
+        doc.addImage(pos.src, 'PNG', pos.x, pos.y, pos.w, pos.h);
+      });
+      doc.save(`VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.pdf`);
+    } else if (format === 'PNG') {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.png`;
+      a.click();
+    } else if (format === 'DTX') {
+      // Native DTX v2 Binary Export
+      const dtxBytes = generateDTXFile(canvas, {
+        widthCm: machineWidth,
+        heightCm: realHeightCm,
+        dpi: 1440,
+        pressTempC: 160,
+        pressDurationSec: 15,
+      });
+      const blob = new Blob([dtxBytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.dtx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (format === 'TIFF') {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.tiff`;
+      a.click();
+    } else if (format === 'EPS') {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `VXEL_Planche_${machineWidth}x${realHeightCm.toFixed(1)}cm.eps`;
+      a.click();
+    }
   };
 
   return (
@@ -179,14 +228,14 @@ export default function DTFPlanchePage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-[calc(100vh-100px)]">
-        
+
         {/* Col 1: Prévisualisation */}
         <div className="lg:col-span-7 bg-[#161616] border border-[#2E2E2E] rounded-lg flex flex-col relative overflow-hidden h-[500px] lg:h-auto">
           <div className="absolute top-2 left-2 z-10 bg-black/80 px-3 py-1.5 rounded text-xs border border-[#F7941D] flex items-center gap-2 font-nunito">
-            {t('planchePage.visualPreview')} 
+            {t('planchePage.visualPreview')}
             <span className="text-[#F7941D] font-mono font-bold ml-1">{previewDimensions}</span>
           </div>
-          <div className="flex-1 w-full h-full overflow-auto flex justify-center items-start p-5" 
+          <div className="flex-1 w-full h-full overflow-auto flex justify-center items-start p-5"
                style={{
                  backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
                  backgroundSize: '20px 20px',
@@ -207,7 +256,58 @@ export default function DTFPlanchePage() {
 
         {/* Col 2: Contrôles & Queue */}
         <div className="lg:col-span-5 flex flex-col gap-3 overflow-y-auto pr-1 font-nunito">
-            
+
+          {/* Machine DTF Selector */}
+          <div className="section bg-[#161616] border border-[#F7941D]/40">
+            <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-2 mb-2">
+              <h3 className="flex items-center gap-2 text-xs font-bold text-[#F7941D] uppercase">
+                <Printer className="w-4 h-4" /> Sélection Machine DTF
+              </h3>
+              <button
+                onClick={() => setShowMachineModal(true)}
+                className="text-[10px] text-[#F7941D] hover:underline font-bold"
+              >
+                Voir toutes les machines →
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <select
+                value={selectedMachine ? selectedMachine.id : 'custom'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'custom') {
+                    setSelectedMachine(null);
+                  } else {
+                    const m = dtfMachinesDatabase.find((item) => item.id === val);
+                    if (m) setSelectedMachine(m);
+                  }
+                }}
+                className="tb-input w-full rounded p-2 text-xs font-bold"
+              >
+                {dtfMachinesDatabase.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.maxResolution})
+                  </option>
+                ))}
+                <option value="custom">Autre machine / Sélection manuelle</option>
+              </select>
+
+              {selectedMachine && (
+                <div className="bg-[#0A0A0A] p-2 rounded border border-[#2E2E2E] text-[11px] space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Format Recommandé :</span>
+                    <strong className="text-[#F7941D]">{selectedMachine.recommendedFormat}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Profil Couleur :</span>
+                    <strong className="text-slate-200">{selectedMachine.colorProfile}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="section">
             <h3 className="flex items-center gap-2"><Ruler className="w-4 h-4" /> {t('planchePage.tagDimensionsTitle')}</h3>
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -259,13 +359,27 @@ export default function DTFPlanchePage() {
               <button onClick={clearQueue} className="bg-red-900/20 text-red-400 border border-red-900/50 py-2 rounded text-xs hover:bg-red-900/40 flex items-center justify-center gap-1">
                 <Trash2 className="w-3 h-3" /> {t('planchePage.clearQueueBtn')}
               </button>
-              <button onClick={downloadPDF} className="tb-btn-primary py-2 rounded text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1">
-                <Download className="w-3 h-3" /> {t('planchePage.downloadPDFBtn')}
+              <button onClick={handleOpenExport} className="tb-btn-primary py-2 rounded text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1">
+                <Download className="w-3 h-3" /> Télécharger Planche DTF
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <MachineCompatibilityModal
+        isOpen={showMachineModal}
+        onClose={() => setShowMachineModal(false)}
+        onSelectMachine={(m) => setSelectedMachine(m)}
+      />
+
+      <ExportFormatModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        selectedMachine={selectedMachine}
+        onConfirmExport={handleConfirmExport}
+      />
     </div>
   );
 }

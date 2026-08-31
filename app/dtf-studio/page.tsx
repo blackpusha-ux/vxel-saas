@@ -223,7 +223,7 @@ export default function DTFStudioPage() {
 
       let removedCount = 0;
       if (bgRemovalMode !== 'none') {
-        removedCount = safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance);
+        removedCount = safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, bgRemovalMode);
       }
 
       const erodeRadius = erodePixels * scale;
@@ -790,15 +790,16 @@ export default function DTFStudioPage() {
                 onChange={(e) => {
                   const m = e.target.value as any;
                   setBgRemovalMode(m);
-                  if (m === 'click') setAwaitingClickColor(true);
+                  if (m === 'click' || m === 'custom') setAwaitingClickColor(true);
                   else setAwaitingClickColor(false);
                 }}
                 className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
               >
-                <option value="auto">{t('studioPage.methodAuto')}</option>
-                <option value="picker">{t('studioPage.methodPicker')}</option>
-                <option value="click">{t('studioPage.methodClick')}</option>
-                <option value="none">{t('studioPage.methodNone')}</option>
+                <option value="auto">{t('studio.bgRemoval.mode.auto')}</option>
+                <option value="black">{t('studio.bgRemoval.mode.black')}</option>
+                <option value="white">{t('studio.bgRemoval.mode.white')}</option>
+                <option value="both">{t('studio.bgRemoval.mode.both')}</option>
+                <option value="custom">{t('studio.bgRemoval.mode.custom')}</option>
               </select>
             </div>
             {bgRemovalMode === 'picker' && (
@@ -1171,18 +1172,63 @@ function safeBackgroundRemoval(
   refR: number,
   refG: number,
   refB: number,
-  toleranceVal: number
+  toleranceVal: number,
+  mode: string = 'auto'
 ) {
-  const tolerance = toleranceVal * 3;
   const n = w * h;
-  const matchColor = (idx: number) =>
-    colorDistManhattan(data[idx], data[idx + 1], data[idx + 2], refR, refG, refB) <= tolerance;
+  const tolBlack = toleranceVal * 3;
+  const tolWhite = Math.max(40, toleranceVal) * 3.5;
+
+  // 1. Analyze 4 corners to detect background colors in 'auto' mode
+  const cornerIndices = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + (w - 1)) * 4];
+  let hasBlackCorner = false;
+  let hasWhiteCorner = false;
+
+  cornerIndices.forEach((idx) => {
+    const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+    if (a < 10) return;
+    const lum = (Math.max(r, g, b) + Math.min(r, g, b)) / 510; // HSL Luminance
+    if (r <= 35 && g <= 35 && b <= 35) hasBlackCorner = true;
+    if (r >= 210 && g >= 210 && b >= 210 && lum > 0.85) hasWhiteCorner = true;
+  });
+
+  const removeBlack = mode === 'black' || mode === 'both' || (mode === 'auto' && hasBlackCorner);
+  const removeWhite = mode === 'white' || mode === 'both' || (mode === 'auto' && hasWhiteCorner);
+  const removeCustom = mode === 'custom' || mode === 'picker' || mode === 'click';
+
+  const matchColor = (idx: number) => {
+    const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+    if (a === 0) return false;
+
+    // Check Black (RGB 0-30 or Manhattan distance)
+    if (removeBlack) {
+      if (r <= 35 && g <= 35 && b <= 35) return true;
+      if (colorDistManhattan(r, g, b, 0, 0, 0) <= tolBlack) return true;
+    }
+
+    // Check White (RGB 225-255 or HSL Lum > 95%)
+    if (removeWhite) {
+      const maxC = Math.max(r, g, b);
+      const minC = Math.min(r, g, b);
+      const lum = (maxC + minC) / 510;
+      if (r >= 215 && g >= 215 && b >= 215 && lum >= 0.92) return true;
+      if (colorDistManhattan(r, g, b, 255, 255, 255) <= tolWhite) return true;
+    }
+
+    // Check Custom color
+    if (removeCustom) {
+      if (colorDistManhattan(r, g, b, refR, refG, refB) <= tolBlack) return true;
+    }
+
+    return false;
+  };
 
   const bg = new Uint8Array(n);
   const queue = new Int32Array(n);
   let qt = 0;
   let qh = 0;
 
+  // Flood fill initialization from border pixels (4 corners & perimeter)
   for (let x = 0; x < w; x++) {
     const p1 = x;
     if (matchColor(p1 * 4) && !bg[p1]) {
@@ -1226,14 +1272,14 @@ function safeBackgroundRemoval(
     }
   }
 
-  let r = 0;
+  let removed = 0;
   for (let i = 0; i < n; i++) {
     if (bg[i] && data[i * 4 + 3] > 0) {
       data[i * 4 + 3] = 0;
-      r++;
+      removed++;
     }
   }
-  return r;
+  return removed;
 }
 
 function fillSmallHoles(data: Uint8ClampedArray, w: number, h: number, maxSize: number) {
