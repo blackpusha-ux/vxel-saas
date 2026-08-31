@@ -84,7 +84,7 @@ export default function AdminPage() {
   };
 
   // Safe inspection of connected email via Clerk
-  const userEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '') : '';
+  const userEmail = isLoaded ? (user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '') : '';
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -137,7 +137,7 @@ export default function AdminPage() {
     }
   }, [isAdmin, fetchUsers, fetchProjects]);
 
-  // Flexible Credit Actions (creditsToAdd or creditsExact, plus +100 quick button)
+  // Flexible Credit Actions
   const handleUpdateCredits = async (userRecord: UserRecord, type: 'add' | 'exact' | 'quick100') => {
     const val = type === 'quick100' ? 100 : creditInputValues[userRecord.clerkId] ?? 10;
     const payload =
@@ -454,7 +454,7 @@ export default function AdminPage() {
                               {u.credits} crédits
                             </span>
                           </td>
-                          {/* Système Flexible : Input Numérique + Ajouter + +100 Rapide + Définir */}
+                          {/* Système Flexible */}
                           <td className="py-3.5 px-4">
                             <div className="flex flex-wrap items-center gap-2">
                               <input
@@ -702,7 +702,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <Footer onOpenContact={() => setIsContactOpen(true)} />
+      <Footer onOpenContact={() => setIsContactOpen(false)} />
       <ContactModal isOpen={isContactOpen} onClose={() => setIsContactOpen(false)} />
     </div>
   );

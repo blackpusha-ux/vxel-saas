@@ -19,9 +19,8 @@ export default function Header({ onOpenContact }: HeaderProps) {
   const [credits, setCredits] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Inspect email safely with Clerk optional chaining and isLoaded check
-  const userEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '') : '';
-  const isAdmin = isLoaded && isSignedIn && !!userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // Exact admin email verification logic using safe optional chaining and isLoaded check
+  const isAdmin = isLoaded ? user?.primaryEmailAddress?.emailAddress?.toLowerCase() === ADMIN_EMAIL.toLowerCase() : false;
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
@@ -75,14 +74,14 @@ export default function Header({ onOpenContact }: HeaderProps) {
             </button>
           )}
 
-          {/* Conditional Admin Link (Safely checked with isLoaded && isAdmin) */}
+          {/* Conditional Admin Link (Desktop) */}
           {isLoaded && isAdmin && (
             <Link
               href="/admin"
-              className="px-3 py-1 bg-[#F7941D]/10 border border-[#F7941D]/40 text-[#F7941D] hover:bg-[#F7941D] hover:text-black rounded-xl font-extrabold transition-all flex items-center gap-1.5 shadow-sm"
+              className="text-[#F7941D] hover:text-[#FFB25A] font-bold text-sm flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-[#F7941D]/10"
             >
-              <Settings className="w-3.5 h-3.5" />
-              <span>⚙️ Admin</span>
+              <Settings className="w-4 h-4" />
+              <span>Admin</span>
             </Link>
           )}
         </nav>
@@ -145,14 +144,15 @@ export default function Header({ onOpenContact }: HeaderProps) {
             {t('common.viewPricing')}
           </Link>
 
+          {/* Conditional Admin Link (Mobile Menu) */}
           {isLoaded && isAdmin && (
             <Link
               href="/admin"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-[#F7941D] font-extrabold border-t border-[#2E2E2E] pt-3 flex items-center gap-2"
+              className="block py-2 text-[#F7941D] font-extrabold border-t border-[#2E2E2E] pt-3 flex items-center gap-2 text-sm"
             >
               <Settings className="w-4 h-4" />
-              <span>⚙️ Admin Back-Office</span>
+              <span>Admin Back-Office</span>
             </Link>
           )}
         </div>
