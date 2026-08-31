@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Layers, ShieldCheck, Zap, AlertCircle } from 'lucide-react';
+import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Layers, ShieldCheck, Zap, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface VectorizerStats {
   colorCount: number;
+  pathCount: number;
   durationMs: number;
   width: number;
   height: number;
@@ -25,12 +26,15 @@ export default function VectorizerTool() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLowRes, setIsLowRes] = useState(false);
+  const [isDtfPresetActive, setIsDtfPresetActive] = useState(true);
 
   // Parameters
-  const [noiseFilter, setNoiseFilter] = useState<number>(1);
-  const [minShapeSize, setMinShapeSize] = useState<number>(4);
-  const [colorCount, setColorCount] = useState<number>(16);
-  const [curveSmoothing, setCurveSmoothing] = useState<number>(1.0);
+  const [qualityMode, setQualityMode] = useState<'low' | 'medium' | 'high' | 'ultra'>('high');
+  const [noiseFilter, setNoiseFilter] = useState<number>(2);
+  const [minShapeSize, setMinShapeSize] = useState<number>(100);
+  const [colorCount, setColorCount] = useState<number>(24);
+  const [curveSmoothing, setCurveSmoothing] = useState<number>(1.5);
 
   const workerRef = useRef<Worker | null>(null);
 
@@ -38,7 +42,7 @@ export default function VectorizerTool() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       workerRef.current = new Worker('/workers/vectorizer-worker.js');
-      
+
       workerRef.current.onmessage = (e) => {
         setIsProcessing(false);
         if (e.data.success) {
@@ -46,7 +50,7 @@ export default function VectorizerTool() {
           setStats(e.data.stats);
           setStatusMessage('');
         } else {
-          setErrorMessage(e.data.error || 'Erreur de vectorisation');
+          setErrorMessage(e.data.error || 'Erreur lors de la vectorisation');
         }
       };
     }
@@ -61,6 +65,7 @@ export default function VectorizerTool() {
   const processVectorization = useCallback(
     (file: File) => {
       setErrorMessage(null);
+      setIsLowRes(false);
 
       if (file.size > 50 * 1024 * 1024) {
         setErrorMessage(t('vectorizer.errorFileTooLarge'));
@@ -80,6 +85,10 @@ export default function VectorizerTool() {
       setOriginalPreviewUrl(objectUrl);
 
       img.onload = () => {
+        if (img.width < 500 || img.height < 500) {
+          setIsLowRes(true);
+        }
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -87,7 +96,7 @@ export default function VectorizerTool() {
 
         if (!ctx) {
           setIsProcessing(false);
-          setErrorMessage('Erreur canvas');
+          setErrorMessage('Erreur d\'initialisation canvas');
           return;
         }
 
@@ -95,6 +104,8 @@ export default function VectorizerTool() {
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
 
         setStatusMessage(t('vectorizer.processing'));
+
+        const scale = qualityMode === 'ultra' ? 4 : qualityMode === 'high' ? 2 : 1;
 
         if (workerRef.current) {
           workerRef.current.postMessage({
@@ -106,18 +117,63 @@ export default function VectorizerTool() {
               minShapeSize,
               colorCount,
               curveSmoothing,
+              scale,
+              qualityMode,
             },
           });
         } else {
           setIsProcessing(false);
-          setErrorMessage('Web Worker indisponible');
+          setErrorMessage('Web Worker de vectorisation indisponible');
         }
       };
 
       img.src = objectUrl;
     },
-    [noiseFilter, minShapeSize, colorCount, curveSmoothing, t]
+    [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode, t]
   );
+
+  const applyDtfRecommendedPreset = () => {
+    setIsDtfPresetActive(true);
+    setQualityMode('high');
+    setNoiseFilter(2);
+    setMinShapeSize(100);
+    setColorCount(24);
+    setCurveSmoothing(1.5);
+    if (originalFile) {
+      setTimeout(() => processVectorization(originalFile), 100);
+    }
+  };
+
+  const handleQualityPresetChange = (newMode: 'low' | 'medium' | 'high' | 'ultra') => {
+    setQualityMode(newMode);
+    setIsDtfPresetActive(false);
+
+    if (newMode === 'low') {
+      setNoiseFilter(1);
+      setMinShapeSize(30);
+      setColorCount(12);
+      setCurveSmoothing(0.8);
+    } else if (newMode === 'medium') {
+      setNoiseFilter(1);
+      setMinShapeSize(60);
+      setColorCount(16);
+      setCurveSmoothing(1.0);
+    } else if (newMode === 'high') {
+      setNoiseFilter(2);
+      setMinShapeSize(100);
+      setColorCount(24);
+      setCurveSmoothing(1.5);
+    } else if (newMode === 'ultra') {
+      setNoiseFilter(3);
+      setMinShapeSize(150);
+      setColorCount(32);
+      setCurveSmoothing(2.0);
+    }
+
+    if (originalFile) {
+      setTimeout(() => processVectorization(originalFile), 100);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -148,7 +204,7 @@ export default function VectorizerTool() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `VXEL_Vectorized_${Date.now()}.svg`;
+    a.download = `VXEL_Vector_DTF_${Date.now()}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -164,28 +220,67 @@ export default function VectorizerTool() {
 
   return (
     <div className="space-y-6 text-slate-200">
-      {/* Banner Title */}
+      {/* Banner Title & Preset Button */}
       <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase mb-2">
-            <Zap className="w-3.5 h-3.5" /> Vectorisation DTF Anti-Bavures Pro
+            <Zap className="w-3.5 h-3.5" /> Vectorisation DTF Anti-Bavures HD
           </div>
           <h2 className="text-2xl font-extrabold text-white">{t('vectorizer.title')}</h2>
           <p className="text-xs text-slate-400 mt-1">{t('vectorizer.sub')}</p>
         </div>
 
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="px-4 py-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-        >
-          <Sliders className="w-4 h-4 text-[#F7941D]" />
-          <span>{showAdvanced ? t('vectorizer.hideAdvancedOptionsBtn') : t('vectorizer.advancedOptionsBtn')}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={applyDtfRecommendedPreset}
+            className="px-4 py-2.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs shadow-lg shadow-[#F7941D]/20 transition-all flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 fill-black" />
+            <span>{t('vectorizer.dtfPresetBtn')}</span>
+          </button>
+
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="px-4 py-2.5 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <Sliders className="w-4 h-4 text-[#F7941D]" />
+            <span>{showAdvanced ? t('vectorizer.hideAdvancedOptionsBtn') : t('vectorizer.advancedOptionsBtn')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quality Mode Selector */}
+      <div className="bg-[#161616] border border-[#2E2E2E] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+          <span>{t('vectorizer.qualityLabel')} :</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
+          {(['low', 'medium', 'high', 'ultra'] as const).map((mode) => {
+            const isSelected = qualityMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => handleQualityPresetChange(mode)}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                  isSelected
+                    ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-md shadow-[#F7941D]/20'
+                    : 'bg-[#0A0A0A] border-[#2E2E2E] text-slate-400 hover:border-slate-500'
+                }`}
+              >
+                {mode === 'low' && t('vectorizer.qualityLow')}
+                {mode === 'medium' && t('vectorizer.qualityMedium')}
+                {mode === 'high' && t('vectorizer.qualityHigh')}
+                {mode === 'ultra' && t('vectorizer.qualityUltra')}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Advanced Parameters Drawer */}
       {showAdvanced && (
-        <div className="bg-[#161616] border border-[#F7941D]/40 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fadeIn">
+        <div className="bg-[#161616] border border-[#F7941D]/40 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* 1. Noise Filter */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold">
@@ -198,7 +293,10 @@ export default function VectorizerTool() {
               max="3"
               step="1"
               value={noiseFilter}
-              onChange={(e) => setNoiseFilter(parseInt(e.target.value))}
+              onChange={(e) => {
+                setIsDtfPresetActive(false);
+                setNoiseFilter(parseInt(e.target.value));
+              }}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
             <p className="text-[10px] text-slate-500">Élimine les bavures d'encre & contours flous DTF</p>
@@ -213,10 +311,13 @@ export default function VectorizerTool() {
             <input
               type="range"
               min="1"
-              max="50"
-              step="1"
+              max="300"
+              step="10"
               value={minShapeSize}
-              onChange={(e) => setMinShapeSize(parseInt(e.target.value))}
+              onChange={(e) => {
+                setIsDtfPresetActive(false);
+                setMinShapeSize(parseInt(e.target.value));
+              }}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
             <p className="text-[10px] text-slate-500">Filtre les micro-artefacts d'impression</p>
@@ -230,11 +331,14 @@ export default function VectorizerTool() {
             </div>
             <input
               type="range"
-              min="2"
+              min="8"
               max="64"
-              step="1"
+              step="2"
               value={colorCount}
-              onChange={(e) => setColorCount(parseInt(e.target.value))}
+              onChange={(e) => {
+                setIsDtfPresetActive(false);
+                setColorCount(parseInt(e.target.value));
+              }}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
             <p className="text-[10px] text-slate-500">Quantification des aplats de couleur</p>
@@ -249,10 +353,13 @@ export default function VectorizerTool() {
             <input
               type="range"
               min="0.1"
-              max="5.0"
+              max="4.0"
               step="0.1"
               value={curveSmoothing}
-              onChange={(e) => setCurveSmoothing(parseFloat(e.target.value))}
+              onChange={(e) => {
+                setIsDtfPresetActive(false);
+                setCurveSmoothing(parseFloat(e.target.value));
+              }}
               className="w-full accent-[#F7941D] cursor-pointer"
             />
             <p className="text-[10px] text-slate-500">Lissage Bézier des tracés vectoriels</p>
@@ -266,10 +373,18 @@ export default function VectorizerTool() {
                 className="px-4 py-2 bg-[#F7941D] text-black font-extrabold rounded-xl text-xs hover:bg-[#FFB25A] flex items-center gap-2"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
-                <span>Appliquer les nouveaux réglages</span>
+                <span>Recalculer le SVG</span>
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Warning Resolution */}
+      {isLowRes && (
+        <div className="bg-amber-950/60 border border-amber-600/60 text-amber-200 p-4 rounded-2xl text-xs flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+          <span>{t('vectorizer.lowResWarning')}</span>
         </div>
       )}
 
@@ -305,18 +420,19 @@ export default function VectorizerTool() {
       {/* Main Preview (Avant / Après Grid) */}
       {originalPreviewUrl && (
         <div className="space-y-6">
-          {/* Actions Bar */}
+          {/* Actions Bar & Stats */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <label className="px-3 py-1.5 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-xs font-bold text-slate-300 rounded-xl cursor-pointer">
                 Changer d'image
                 <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFileChange} className="hidden" />
               </label>
 
               {stats && (
-                <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                <div className="flex items-center gap-3 text-xs text-slate-300 font-mono">
                   <span>🎨 {t('vectorizer.statsColors')} <strong className="text-white">{stats.colorCount}</strong></span>
-                  <span>⚡ {t('vectorizer.statsTime')} <strong className="text-[#F7941D]">{stats.durationMs}ms</strong></span>
+                  <span>📏 {t('vectorizer.statsPaths')} <strong className="text-[#F7941D]">{stats.pathCount.toLocaleString()}</strong></span>
+                  <span>⚡ {t('vectorizer.statsTime')} <strong className="text-white">{stats.durationMs}ms</strong></span>
                 </div>
               )}
             </div>
@@ -360,26 +476,26 @@ export default function VectorizerTool() {
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono">PNG / JPG</span>
               </div>
-              <div className="relative min-h-[350px] bg-[#0A0A0A] rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#2E2E2E]">
+              <div className="relative min-h-[380px] bg-[#0A0A0A] rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#2E2E2E]">
                 <img
                   src={originalPreviewUrl}
                   alt="Original Artwork"
-                  className="max-h-[350px] max-w-full object-contain"
+                  className="max-h-[380px] max-w-full object-contain"
                 />
               </div>
             </div>
 
-            {/* Après (SVG Vectoriel) */}
+            {/* Après (SVG Vectoriel HD) */}
             <div className="bg-[#161616] border border-[#F7941D]/50 rounded-3xl p-4 flex flex-col justify-between space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
                 <span className="text-xs font-extrabold uppercase text-[#F7941D] tracking-wider">
                   ⚡ {t('vectorizer.after')}
                 </span>
-                <span className="text-[10px] text-green-400 font-mono font-bold">Vectoriel Clean SVG</span>
+                <span className="text-[10px] text-green-400 font-mono font-bold">Vectoriel Clean Bézier</span>
               </div>
 
               <div
-                className="relative min-h-[350px] rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#2E2E2E]"
+                className="relative min-h-[380px] rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#2E2E2E]"
                 style={{
                   backgroundImage:
                     'linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%)',
@@ -391,11 +507,11 @@ export default function VectorizerTool() {
                 {vectorizedSvg ? (
                   <div
                     dangerouslySetInnerHTML={{ __html: vectorizedSvg }}
-                    className="max-h-[350px] max-w-full flex items-center justify-center [&>svg]:max-h-[350px] [&>svg]:w-auto"
+                    className="max-h-[380px] max-w-full flex items-center justify-center [&>svg]:max-h-[380px] [&>svg]:w-auto [&>svg]:h-auto"
                   />
                 ) : (
                   <div className="text-xs text-slate-500 font-mono animate-pulse">
-                    En attente du résultat vectoriel...
+                    Génération des tracés vectoriels...
                   </div>
                 )}
               </div>
