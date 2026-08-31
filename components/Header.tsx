@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { UserButton, useUser, SignInButton, SignUpButton } from '@clerk/nextjs';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Layers, Wand2, Sparkles, CreditCard, Mail, Menu, X, ShieldAlert } from 'lucide-react';
+import { Layers, Wand2, Zap, CreditCard, Mail, Menu, X } from 'lucide-react';
 
 interface HeaderProps {
   onOpenContact?: () => void;
@@ -49,6 +49,10 @@ export default function Header({ onOpenContact }: HeaderProps) {
           <Link href="/dtf-studio" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
             <Wand2 className="w-3.5 h-3.5 text-[#F7941D]" />
             <span>Studio DTF</span>
+          </Link>
+          <Link href="/vectoriseur" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-[#F7941D]" />
+            <span>Vectoriseur Pro</span>
           </Link>
           <Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-[#F7941D]" />
@@ -113,6 +117,9 @@ export default function Header({ onOpenContact }: HeaderProps) {
           </Link>
           <Link href="/dtf-studio" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
             Studio DTF
+          </Link>
+          <Link href="/vectoriseur" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
+            Vectoriseur Pro
           </Link>
           <Link href="/dtf-planche" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
             Outil Planche DTF

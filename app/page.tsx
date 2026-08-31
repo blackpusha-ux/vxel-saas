@@ -58,8 +58,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* 2 Quick Access Tool Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto pt-6 text-left">
+          {/* 3 Quick Access Tool Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto pt-6 text-left">
             {/* Tool 1: Studio DTF */}
             <Link
               href="/dtf-studio"
@@ -85,7 +85,37 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Tool 2: Outil Planche DTF */}
+            {/* Tool 2: Vectoriseur DTF Pro (VTracer) */}
+            <Link
+              href="/vectoriseur"
+              className="bg-[#161616] border border-[#F7941D]/60 hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/20 group flex flex-col justify-between relative overflow-hidden shadow-lg"
+            >
+              <div className="space-y-4">
+                <div className="w-14 h-14 bg-[#F7941D] text-black rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-[#F7941D]/30">
+                  <Zap className="w-7 h-7 fill-black" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-black text-white group-hover:text-[#F7941D] transition-colors">
+                      Vectoriseur Pro
+                    </h3>
+                    <span className="px-2 py-0.5 bg-[#F7941D]/20 text-[#F7941D] border border-[#F7941D]/40 text-[10px] font-extrabold rounded-full">
+                      VTracer IA
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    Vectorisation multicolore HD sans perte, conversion PNG/JPG en SVG vectoriel lisse pour impression DTF.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-8 flex items-center gap-2 text-xs font-black text-[#F7941D] uppercase tracking-wider group-hover:translate-x-1 transition-transform">
+                <span>Vectoriser une image</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            </Link>
+
+            {/* Tool 3: Outil Planche DTF */}
             <Link
               href="/dtf-planche"
               className="bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/10 group flex flex-col justify-between relative overflow-hidden"
