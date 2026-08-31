@@ -5,6 +5,7 @@ import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
+import VectorizerTool from '@/components/VectorizerTool';
 
 interface FabricSwatch {
   name: string;
@@ -56,6 +57,7 @@ function median(arr: number[]) {
 export default function DTFStudioPage() {
   const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
+  const [activeTab, setActiveTab] = useState<'studio' | 'vectorizer'>('studio');
   const [credits, setCredits] = useState<number | null>(null);
 
   // States UI
@@ -629,8 +631,37 @@ export default function DTFStudioPage() {
         </div>
       </header>
 
-      {/* Grille principale */}
-      <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b border-[#2E2E2E] pb-2 my-3">
+        <button
+          onClick={() => setActiveTab('studio')}
+          className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border flex items-center gap-2 ${
+            activeTab === 'studio'
+              ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-lg shadow-[#F7941D]/20'
+              : 'bg-[#161616] text-slate-300 border-[#2E2E2E] hover:border-slate-500'
+          }`}
+        >
+          <span>🖼️</span>
+          <span>{t('studioPage.tabStudio')}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('vectorizer')}
+          className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border flex items-center gap-2 ${
+            activeTab === 'vectorizer'
+              ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-lg shadow-[#F7941D]/20'
+              : 'bg-[#161616] text-slate-300 border-[#2E2E2E] hover:border-slate-500'
+          }`}
+        >
+          <span>⚡</span>
+          <span>{t('studioPage.tabVectorizer')}</span>
+        </button>
+      </div>
+
+      {activeTab === 'vectorizer' ? (
+        <VectorizerTool />
+      ) : (
+        /* Grille principale */
+        <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
         {/* Colonne 1 : Prévisualisation */}
         <div className="col-span-12 lg:col-span-5 bg-[#161616] border border-[#2E2E2E] rounded-lg flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[#2E2E2E]">
@@ -1121,6 +1152,7 @@ export default function DTFStudioPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
