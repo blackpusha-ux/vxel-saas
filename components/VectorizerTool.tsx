@@ -1,14 +1,29 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Zap, AlertTriangle, AlertCircle, Server } from 'lucide-react';
+import { Upload, Sliders, Download, Copy, Check, Sparkles, RefreshCw, Zap, AlertTriangle, AlertCircle, Server, Image as ImageIcon, Trash2, Wand2, Layers, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
+export const DTF_VECTORIZER_PROMPT =
+  "Vectorise cette image en SVG haute qualité pour impression DTF professionnelle avec suppression automatique du fond pour obtenir un fond 100% transparent mode vectorisation couleur complète avec hiérarchie cutout en couches superposées conserver toutes les couleurs distinctes et la palette fidèle à l'originale sans dithering précision des courbes de Bézier élevée pour des contours nets et lisses réduction du bruit et suppression des artefacts pixels parasites préserver tous les détails importants optimiser les paths pour un fichier léger mais détaillé qualité équivalente 300 DPI minimum contours vectoriels propres sans pixelisation aplats de couleurs vives pour style cartoon et dégradés convertis en zones discrètes pour style réaliste résultat final SVG vectoriel scalable à l'infini avec fond transparent prêt pour impression DTF textile professionnelle";
+
 interface VectorizerStats {
-  colorCount?: number;
-  pathCount?: number;
+  colors_count?: number;
+  total_paths?: number;
   durationMs: number;
   engine?: string;
+  width?: number;
+  height?: number;
+}
+
+interface SavedProject {
+  id: string;
+  name: string;
+  svg: string;
+  pngBase64?: string;
+  previewUrl: string;
+  date: string;
+  stats?: VectorizerStats;
 }
 
 export default function VectorizerTool() {
@@ -17,25 +32,45 @@ export default function VectorizerTool() {
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
   const [vectorizedSvg, setVectorizedSvg] = useState<string | null>(null);
+  const [transparentPngBase64, setTransparentPngBase64] = useState<string | null>(null);
   const [stats, setStats] = useState<VectorizerStats | null>(null);
+
+  // VTracer Advanced Controls State
+  const [colorMode, setColorMode] = useState<'color' | 'binary'>('color');
+  const [hierarchical, setHierarchical] = useState<'cutout' | 'stacked'>('cutout');
+  const [filterSpeckle, setFilterSpeckle] = useState<number>(5);
+  const [cornerThreshold, setCornerThreshold] = useState<number>(0.6);
+  const [lengthThreshold, setLengthThreshold] = useState<number>(4.0);
+  const [maxIterations, setMaxIterations] = useState<number>(10);
+  const [colorPrecision, setColorPrecision] = useState<number>(8);
+  const [pathPrecision, setPathPrecision] = useState<number>(8);
+  const [layerDifference, setLayerDifference] = useState<number>(16);
+  const [autoRemoveBg, setAutoRemoveBg] = useState<boolean>(true);
+  const [customPrompt, setCustomPrompt] = useState<string>(DTF_VECTORIZER_PROMPT);
 
   // States UI
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLowRes, setIsLowRes] = useState(false);
-  const [activeEngine, setActiveEngine] = useState<'potrace_server' | 'local_worker'>('potrace_server');
-
-  // Parameters
-  const [qualityMode, setQualityMode] = useState<'low' | 'medium' | 'high' | 'ultra'>('high');
-  const [noiseFilter, setNoiseFilter] = useState<number>(2);
-  const [minShapeSize, setMinShapeSize] = useState<number>(100);
-  const [colorCount, setColorCount] = useState<number>(24);
-  const [curveSmoothing, setCurveSmoothing] = useState<number>(1.5);
+  const [history, setHistory] = useState<SavedProject[]>([]);
 
   const workerRef = useRef<Worker | null>(null);
+
+  // Load History from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('vxel_vector_history');
+      if (saved) {
+        setHistory(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn('Could not load history');
+    }
+  }, []);
 
   // Initialize Web Worker Fallback
   useEffect(() => {
@@ -44,15 +79,15 @@ export default function VectorizerTool() {
 
       workerRef.current.onmessage = (e) => {
         setIsProcessing(false);
+        setProgress(100);
         if (e.data.success) {
           setVectorizedSvg(e.data.svg);
           setStats({
-            colorCount: e.data.stats.colorCount,
-            pathCount: e.data.stats.pathCount,
+            colors_count: e.data.stats.colorCount,
+            total_paths: e.data.stats.pathCount,
             durationMs: e.data.stats.durationMs,
-            engine: 'local_worker',
+            engine: 'Client Web Worker (Fallback)',
           });
-          setActiveEngine('local_worker');
           setStatusMessage('');
         } else {
           setErrorMessage(e.data.error || 'Erreur lors de la vectorisation');
@@ -68,7 +103,7 @@ export default function VectorizerTool() {
   }, []);
 
   const fallbackToLocalWorker = useCallback((file: File) => {
-    setStatusMessage('Vectorisation secours Web Worker...');
+    setStatusMessage('Execution de secours Web Worker...');
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
 
@@ -85,14 +120,19 @@ export default function VectorizerTool() {
 
       ctx.drawImage(img, 0, 0);
       const imageData = ctx.getImageData(0, 0, img.width, img.height);
-      const scale = qualityMode === 'ultra' ? 4 : qualityMode === 'high' ? 2 : 1;
 
       if (workerRef.current) {
         workerRef.current.postMessage({
           imageData,
           width: img.width,
           height: img.height,
-          options: { noiseFilter, minShapeSize, colorCount, curveSmoothing, scale, qualityMode },
+          options: {
+            noiseFilter: Math.round(filterSpeckle / 2),
+            minShapeSize: filterSpeckle * 10,
+            colorCount: Math.pow(2, Math.min(5, colorPrecision - 3)) * 4,
+            curveSmoothing: cornerThreshold * 2,
+            scale: pathPrecision >= 7 ? 2 : 1,
+          },
         });
       } else {
         setIsProcessing(false);
@@ -101,7 +141,7 @@ export default function VectorizerTool() {
     };
 
     img.src = objectUrl;
-  }, [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode]);
+  }, [filterSpeckle, colorPrecision, cornerThreshold, pathPrecision]);
 
   const processVectorization = useCallback(
     async (file: File) => {
@@ -119,7 +159,8 @@ export default function VectorizerTool() {
       }
 
       setIsProcessing(true);
-      setStatusMessage('Vectorisation IA Potrace en cours sur nos serveurs...');
+      setProgress(15);
+      setStatusMessage('Analyse de l\'image & pré-traitement IA rembg...');
 
       const objectUrl = URL.createObjectURL(file);
       setOriginalPreviewUrl(objectUrl);
@@ -132,84 +173,106 @@ export default function VectorizerTool() {
       };
       img.src = objectUrl;
 
-      // Try Server API route
+      // Simulate progress bar
+      const timer = setInterval(() => {
+        setProgress((prev) => (prev < 85 ? prev + 15 : prev));
+      }, 300);
+
       try {
         const formData = new FormData();
         formData.append('file', file);
         formData.append(
           'options',
           JSON.stringify({
-            noiseFilter,
-            minShapeSize,
-            colorCount,
-            curveSmoothing,
-            scale: qualityMode === 'ultra' ? 4 : 2,
+            color_mode: colorMode,
+            hierarchical,
+            filter_speckle: filterSpeckle,
+            corner_threshold: cornerThreshold,
+            length_threshold: lengthThreshold,
+            max_iterations: maxIterations,
+            color_precision: colorPrecision,
+            path_precision: pathPrecision,
+            layer_difference: layerDifference,
+            auto_remove_bg: autoRemoveBg,
+            prompt: customPrompt,
           })
         );
+
+        setStatusMessage('Génération des tracés Bézier VTracer 300 DPI...');
 
         const res = await fetch('/api/vectorize', {
           method: 'POST',
           body: formData,
         });
 
+        clearInterval(timer);
+        setProgress(95);
+
         const data = await res.json();
 
         if (data.success && data.svg) {
           setIsProcessing(false);
+          setProgress(100);
           setVectorizedSvg(data.svg);
-          setStats({
-            durationMs: data.stats.durationMs,
-            engine: 'Potrace Python Server',
-          });
-          setActiveEngine('potrace_server');
+          setTransparentPngBase64(data.pngBase64 || null);
+          setStats(data.stats);
           setStatusMessage('');
+
+          // Save to local project history
+          const newProj: SavedProject = {
+            id: `proj_${Date.now()}`,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            svg: data.svg,
+            pngBase64: data.pngBase64,
+            previewUrl: objectUrl,
+            date: new Date().toLocaleDateString(),
+            stats: data.stats,
+          };
+
+          setHistory((prev) => {
+            const updated = [newProj, ...prev.slice(0, 9)];
+            localStorage.setItem('vxel_vector_history', JSON.stringify(updated));
+            return updated;
+          });
         } else {
-          console.warn('Server vectorization error, triggering fallback worker:', data.error);
+          console.warn('Server vectorization error, fallback to worker:', data.error);
           fallbackToLocalWorker(file);
         }
       } catch (err) {
-        console.warn('Network error calling server vectorizer, triggering fallback worker:', err);
+        clearInterval(timer);
+        console.warn('Server call failed, fallback to worker:', err);
         fallbackToLocalWorker(file);
       }
     },
-    [noiseFilter, minShapeSize, colorCount, curveSmoothing, qualityMode, fallbackToLocalWorker, t]
+    [
+      colorMode,
+      hierarchical,
+      filterSpeckle,
+      cornerThreshold,
+      lengthThreshold,
+      maxIterations,
+      colorPrecision,
+      pathPrecision,
+      layerDifference,
+      autoRemoveBg,
+      customPrompt,
+      fallbackToLocalWorker,
+      t,
+    ]
   );
 
-  const applyDtfRecommendedPreset = () => {
-    setQualityMode('high');
-    setNoiseFilter(2);
-    setMinShapeSize(100);
-    setColorCount(24);
-    setCurveSmoothing(1.5);
-    if (originalFile) {
-      setTimeout(() => processVectorization(originalFile), 100);
-    }
-  };
-
-  const handleQualityPresetChange = (newMode: 'low' | 'medium' | 'high' | 'ultra') => {
-    setQualityMode(newMode);
-
-    if (newMode === 'low') {
-      setNoiseFilter(1);
-      setMinShapeSize(30);
-      setColorCount(12);
-      setCurveSmoothing(0.8);
-    } else if (newMode === 'medium') {
-      setNoiseFilter(1);
-      setMinShapeSize(60);
-      setColorCount(16);
-      setCurveSmoothing(1.0);
-    } else if (newMode === 'high') {
-      setNoiseFilter(2);
-      setMinShapeSize(100);
-      setColorCount(24);
-      setCurveSmoothing(1.5);
-    } else if (newMode === 'ultra') {
-      setNoiseFilter(3);
-      setMinShapeSize(150);
-      setColorCount(32);
-      setCurveSmoothing(2.0);
-    }
+  const applyDtfPreset = () => {
+    setColorMode('color');
+    setHierarchical('cutout');
+    setFilterSpeckle(5);
+    setCornerThreshold(0.6);
+    setLengthThreshold(4.0);
+    setMaxIterations(10);
+    setColorPrecision(8);
+    setPathPrecision(8);
+    setLayerDifference(16);
+    setAutoRemoveBg(true);
+    setCustomPrompt(DTF_VECTORIZER_PROMPT);
 
     if (originalFile) {
       setTimeout(() => processVectorization(originalFile), 100);
@@ -233,23 +296,27 @@ export default function VectorizerTool() {
     }
   };
 
-  const handleReProcess = () => {
-    if (originalFile) {
-      processVectorization(originalFile);
-    }
-  };
-
   const handleDownloadSvg = () => {
     if (!vectorizedSvg) return;
     const blob = new Blob([vectorizedSvg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `VXEL_Potrace_DTF_${Date.now()}.svg`;
+    a.download = `VXEL_DTF_Vector_${Date.now()}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPng = () => {
+    if (!transparentPngBase64) return;
+    const a = document.createElement('a');
+    a.href = transparentPngBase64;
+    a.download = `VXEL_DTF_Transparent_${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleCopyCode = () => {
@@ -259,21 +326,49 @@ export default function VectorizerTool() {
     setTimeout(() => setCopiedCode(false), 3000);
   };
 
+  const deleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistory((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      localStorage.setItem('vxel_vector_history', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const loadHistoryItem = (item: SavedProject) => {
+    setOriginalPreviewUrl(item.previewUrl);
+    setVectorizedSvg(item.svg);
+    setTransparentPngBase64(item.pngBase64 || null);
+    if (item.stats) setStats(item.stats);
+  };
+
   return (
     <div className="space-y-6 text-slate-200">
-      {/* Banner Title & Preset Button */}
+      {/* Banner Title & Main Actions */}
       <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase mb-2">
-            <Server className="w-3.5 h-3.5" /> Vectorisation Potrace Server IA
+            <Zap className="w-3.5 h-3.5" /> Moteur VTracer & Potrace IA 300 DPI
           </div>
-          <h2 className="text-2xl font-extrabold text-white">{t('vectorizer.title')}</h2>
+          <h2 className="text-2xl font-black text-white">{t('vectorizer.title')}</h2>
           <p className="text-xs text-slate-400 mt-1">{t('vectorizer.sub')}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={applyDtfRecommendedPreset}
+            onClick={() => setAutoRemoveBg(!autoRemoveBg)}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${
+              autoRemoveBg
+                ? 'bg-green-950/60 border-green-500 text-green-300'
+                : 'bg-[#0A0A0A] border-[#2E2E2E] text-slate-400'
+            }`}
+          >
+            <Wand2 className="w-4 h-4 text-[#F7941D]" />
+            <span>Fond AI Transparent {autoRemoveBg ? 'ON' : 'OFF'}</span>
+          </button>
+
+          <button
+            onClick={applyDtfPreset}
             className="px-4 py-2.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs shadow-lg shadow-[#F7941D]/20 transition-all flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4 fill-black" />
@@ -290,115 +385,205 @@ export default function VectorizerTool() {
         </div>
       </div>
 
-      {/* Quality Mode Selector */}
-      <div className="bg-[#161616] border border-[#2E2E2E] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-          <span>{t('vectorizer.qualityLabel')} :</span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
-          {(['low', 'medium', 'high', 'ultra'] as const).map((mode) => {
-            const isSelected = qualityMode === mode;
-            return (
-              <button
-                key={mode}
-                onClick={() => handleQualityPresetChange(mode)}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
-                  isSelected
-                    ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-md shadow-[#F7941D]/20'
-                    : 'bg-[#0A0A0A] border-[#2E2E2E] text-slate-400 hover:border-slate-500'
-                }`}
-              >
-                {mode === 'low' && t('vectorizer.qualityLow')}
-                {mode === 'medium' && t('vectorizer.qualityMedium')}
-                {mode === 'high' && t('vectorizer.qualityHigh')}
-                {mode === 'ultra' && t('vectorizer.qualityUltra')}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Advanced Parameters Drawer */}
+      {/* Advanced VTracer Configuration Drawer */}
       {showAdvanced && (
-        <div className="bg-[#161616] border border-[#F7941D]/40 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-slate-300">{t('vectorizer.noiseFilterLabel')}</span>
-              <span className="text-[#F7941D] font-mono">{noiseFilter}</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="3"
-              step="1"
-              value={noiseFilter}
-              onChange={(e) => setNoiseFilter(parseInt(e.target.value))}
-              className="w-full accent-[#F7941D] cursor-pointer"
-            />
-            <p className="text-[10px] text-slate-500">Flou Gaussien OpenCV anti-bruit</p>
+        <div className="bg-[#161616] border border-[#F7941D]/40 rounded-2xl p-6 space-y-6">
+          <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
+            <h3 className="text-sm font-extrabold text-[#F7941D] uppercase tracking-wider flex items-center gap-2">
+              <Sliders className="w-4 h-4" /> Configuration Moteur VTracer & Bézier DTF
+            </h3>
+            <span className="text-[10px] text-slate-500 font-mono">Precision: 300 DPI Vector</span>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-slate-300">{t('vectorizer.minShapeSizeLabel')}</span>
-              <span className="text-[#F7941D] font-mono">{minShapeSize} px²</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Color Mode */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">Mode Couleur (color_mode)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setColorMode('color')}
+                  className={`py-2 text-xs font-bold rounded-xl border ${
+                    colorMode === 'color' ? 'bg-[#F7941D] text-black border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E]'
+                  }`}
+                >
+                  Couleur Complète
+                </button>
+                <button
+                  onClick={() => setColorMode('binary')}
+                  className={`py-2 text-xs font-bold rounded-xl border ${
+                    colorMode === 'binary' ? 'bg-[#F7941D] text-black border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E]'
+                  }`}
+                >
+                  Binaire N&B
+                </button>
+              </div>
             </div>
-            <input
-              type="range"
-              min="1"
-              max="300"
-              step="10"
-              value={minShapeSize}
-              onChange={(e) => setMinShapeSize(parseInt(e.target.value))}
-              className="w-full accent-[#F7941D] cursor-pointer"
-            />
-            <p className="text-[10px] text-slate-500">Turdsize Potrace (min. surface shape)</p>
+
+            {/* Hierarchical Mode */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">Hiérarchie Couches (hierarchical)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setHierarchical('cutout')}
+                  className={`py-2 text-xs font-bold rounded-xl border ${
+                    hierarchical === 'cutout' ? 'bg-[#F7941D] text-black border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E]'
+                  }`}
+                >
+                  Découpe (Cutout)
+                </button>
+                <button
+                  onClick={() => setHierarchical('stacked')}
+                  className={`py-2 text-xs font-bold rounded-xl border ${
+                    hierarchical === 'stacked' ? 'bg-[#F7941D] text-black border-[#F7941D]' : 'bg-[#0A0A0A] border-[#2E2E2E]'
+                  }`}
+                >
+                  Superposé (Stacked)
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Speckle */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Filtre Speckle (filter_speckle)</span>
+                <span className="text-[#F7941D] font-mono">{filterSpeckle} px²</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="16"
+                step="1"
+                value={filterSpeckle}
+                onChange={(e) => setFilterSpeckle(parseInt(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Corner Threshold */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Seuil Angles (corner_threshold)</span>
+                <span className="text-[#F7941D] font-mono">{cornerThreshold.toFixed(1)}</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="1.0"
+                step="0.1"
+                value={cornerThreshold}
+                onChange={(e) => setCornerThreshold(parseFloat(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Length Threshold */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Seuil Longueur (length_threshold)</span>
+                <span className="text-[#F7941D] font-mono">{lengthThreshold.toFixed(1)}</span>
+              </div>
+              <input
+                type="range"
+                min="1.0"
+                max="10.0"
+                step="0.5"
+                value={lengthThreshold}
+                onChange={(e) => setLengthThreshold(parseFloat(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Max Iterations */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Max Itérations (max_iterations)</span>
+                <span className="text-[#F7941D] font-mono">{maxIterations}</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                step="1"
+                value={maxIterations}
+                onChange={(e) => setMaxIterations(parseInt(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Color Precision */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Précision Couleurs (color_precision)</span>
+                <span className="text-[#F7941D] font-mono">{colorPrecision}</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                step="1"
+                value={colorPrecision}
+                onChange={(e) => setColorPrecision(parseInt(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Path Precision */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Précision Tracés (path_precision)</span>
+                <span className="text-[#F7941D] font-mono">{pathPrecision}</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                step="1"
+                value={pathPrecision}
+                onChange={(e) => setPathPrecision(parseInt(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
+
+            {/* Layer Difference */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-300">Différence Couches (layer_difference)</span>
+                <span className="text-[#F7941D] font-mono">{layerDifference}</span>
+              </div>
+              <input
+                type="range"
+                min="4"
+                max="32"
+                step="2"
+                value={layerDifference}
+                onChange={(e) => setLayerDifference(parseInt(e.target.value))}
+                className="w-full accent-[#F7941D] cursor-pointer"
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-slate-300">{t('vectorizer.colorCountLabel')}</span>
-              <span className="text-[#F7941D] font-mono">{colorCount}</span>
-            </div>
-            <input
-              type="range"
-              min="8"
-              max="64"
-              step="2"
-              value={colorCount}
-              onChange={(e) => setColorCount(parseInt(e.target.value))}
-              className="w-full accent-[#F7941D] cursor-pointer"
+          {/* Embedded Prompt Box */}
+          <div className="space-y-2 pt-3 border-t border-[#2E2E2E]">
+            <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-[#F7941D]" /> Prompt de Vectorisation Intégré DTF :
+            </label>
+            <textarea
+              rows={3}
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              className="w-full bg-[#0A0A0A] border border-[#2E2E2E] text-slate-300 rounded-xl p-3 text-xs font-mono focus:border-[#F7941D] outline-none"
             />
-            <p className="text-[10px] text-slate-500">Quantification K-Means</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-slate-300">{t('vectorizer.curveSmoothingLabel')}</span>
-              <span className="text-[#F7941D] font-mono">{curveSmoothing.toFixed(1)}</span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="4.0"
-              step="0.1"
-              value={curveSmoothing}
-              onChange={(e) => setCurveSmoothing(parseFloat(e.target.value))}
-              className="w-full accent-[#F7941D] cursor-pointer"
-            />
-            <p className="text-[10px] text-slate-500">Alphamax Potrace (Bézier smoothing)</p>
           </div>
 
           {originalFile && (
-            <div className="col-span-full pt-2 flex justify-end">
+            <div className="flex justify-end">
               <button
-                onClick={handleReProcess}
+                onClick={() => processVectorization(originalFile)}
                 disabled={isProcessing}
-                className="px-4 py-2 bg-[#F7941D] text-black font-extrabold rounded-xl text-xs hover:bg-[#FFB25A] flex items-center gap-2"
+                className="px-6 py-2.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-[#F7941D]/20"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
-                <span>Recalculer le SVG</span>
+                <span>Exécuter Vectorisation avec Prompt DTF</span>
               </button>
             </div>
           )}
@@ -442,8 +627,23 @@ export default function VectorizerTool() {
         </div>
       )}
 
+      {/* Processing Status Banner with Progress Bar */}
+      {isProcessing && (
+        <div className="bg-[#161616] border border-[#F7941D]/50 p-6 rounded-2xl space-y-3 animate-pulse">
+          <div className="flex items-center justify-between text-xs font-bold text-[#F7941D]">
+            <span className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin" /> {statusMessage || 'Traitement en cours...'}
+            </span>
+            <span>{progress}%</span>
+          </div>
+          <div className="w-full bg-[#0A0A0A] h-2.5 rounded-full overflow-hidden border border-[#2E2E2E]">
+            <div className="bg-[#F7941D] h-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* Main Preview (Avant / Après Grid) */}
-      {originalPreviewUrl && (
+      {originalPreviewUrl && !isProcessing && (
         <div className="space-y-6">
           {/* Actions Bar & Stats */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -455,8 +655,9 @@ export default function VectorizerTool() {
 
               {stats && (
                 <div className="flex items-center gap-3 text-xs text-slate-300 font-mono">
-                  <span>⚡ Moteur : <strong className="text-[#F7941D]">{stats.engine || 'Potrace'}</strong></span>
-                  <span>⏱️ Temps : <strong className="text-white">{stats.durationMs}ms</strong></span>
+                  {stats.colors_count && <span>🎨 Couleurs: <strong className="text-white">{stats.colors_count}</strong></span>}
+                  {stats.total_paths && <span>📏 Tracés Bézier: <strong className="text-[#F7941D]">{stats.total_paths.toLocaleString()}</strong></span>}
+                  <span>⏱️ Temps: <strong className="text-white">{stats.durationMs}ms</strong></span>
                 </div>
               )}
             </div>
@@ -464,16 +665,26 @@ export default function VectorizerTool() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handleCopyCode}
-                disabled={!vectorizedSvg || isProcessing}
+                disabled={!vectorizedSvg}
                 className="flex-1 sm:flex-initial px-4 py-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
               >
                 {copiedCode ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedCode ? t('vectorizer.codeCopied') : t('vectorizer.copyCodeBtn')}</span>
               </button>
 
+              {transparentPngBase64 && (
+                <button
+                  onClick={handleDownloadPng}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#161616] border border-[#F7941D]/60 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-[#222]"
+                >
+                  <ImageIcon className="w-4 h-4 text-[#F7941D]" />
+                  <span>PNG Transparent HD</span>
+                </button>
+              )}
+
               <button
                 onClick={handleDownloadSvg}
-                disabled={!vectorizedSvg || isProcessing}
+                disabled={!vectorizedSvg}
                 className="flex-1 sm:flex-initial px-5 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#F7941D]/20"
               >
                 <Download className="w-4 h-4" />
@@ -481,14 +692,6 @@ export default function VectorizerTool() {
               </button>
             </div>
           </div>
-
-          {/* Processing Status Banner */}
-          {isProcessing && (
-            <div className="bg-[#F7941D]/10 border border-[#F7941D] text-[#F7941D] p-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 animate-pulse">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>{statusMessage || 'Vectorisation IA en cours...'}</span>
-            </div>
-          )}
 
           {/* Grid Avant / Après */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -498,7 +701,7 @@ export default function VectorizerTool() {
                 <span className="text-xs font-extrabold uppercase text-slate-400 tracking-wider">
                   📷 {t('vectorizer.before')}
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono">PNG / JPG</span>
+                <span className="text-[10px] text-slate-500 font-mono">PNG / JPG / WEBP</span>
               </div>
               <div className="relative min-h-[380px] bg-[#0A0A0A] rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#2E2E2E]">
                 <img
@@ -509,13 +712,13 @@ export default function VectorizerTool() {
               </div>
             </div>
 
-            {/* Après (SVG Potrace HD) */}
+            {/* Après (SVG Vectoriel VTracer HD) */}
             <div className="bg-[#161616] border border-[#F7941D]/50 rounded-3xl p-4 flex flex-col justify-between space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
                 <span className="text-xs font-extrabold uppercase text-[#F7941D] tracking-wider">
                   ⚡ {t('vectorizer.after')}
                 </span>
-                <span className="text-[10px] text-green-400 font-mono font-bold">Potrace Server HD</span>
+                <span className="text-[10px] text-green-400 font-mono font-bold">VTracer Vector 300 DPI</span>
               </div>
 
               <div
@@ -535,11 +738,47 @@ export default function VectorizerTool() {
                   />
                 ) : (
                   <div className="text-xs text-slate-500 font-mono animate-pulse">
-                    Génération des tracés vectoriels Potrace...
+                    Génération des tracés vectoriels VTracer...
                   </div>
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* History of Saved Vectorizations */}
+      {history.length > 0 && (
+        <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 space-y-4">
+          <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#F7941D]" /> Historique des Projets Vectorisés ({history.length})
+          </h3>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+            {history.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => loadHistoryItem(item)}
+                className="bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] rounded-2xl p-3 cursor-pointer group transition-all relative flex flex-col justify-between"
+              >
+                <div className="w-full h-24 bg-[#111] rounded-xl flex items-center justify-center overflow-hidden mb-2 relative">
+                  <div
+                    dangerouslySetInnerHTML={{ __html: item.svg }}
+                    className="max-h-20 max-w-full [&>svg]:max-h-20 [&>svg]:w-auto"
+                  />
+                  <button
+                    onClick={(e) => deleteHistoryItem(item.id, e)}
+                    className="absolute top-1 right-1 p-1 bg-red-950/80 text-red-400 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
+                  <span className="text-[10px] text-slate-500">{item.date}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
