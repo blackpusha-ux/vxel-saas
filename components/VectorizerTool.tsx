@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Sliders, Download, Copy, Check, RefreshCw, Zap, AlertCircle, Layers, Image as ImageIcon } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
-interface VTracerStats {
+interface ImageToVectorStats {
   colorCount: number;
   pathCount: number;
   durationMs: number;
@@ -17,7 +17,7 @@ export default function VectorizerTool() {
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null);
   const [vectorizedSvg, setVectorizedSvg] = useState<string | null>(null);
-  const [stats, setStats] = useState<VTracerStats | null>(null);
+  const [stats, setStats] = useState<ImageToVectorStats | null>(null);
 
   // Sliders State
   const [numColors, setNumColors] = useState<number>(16);
@@ -43,9 +43,14 @@ export default function VectorizerTool() {
 
         if (e.data.success) {
           setVectorizedSvg(e.data.svg);
-          setStats(e.data.stats);
+          setStats({
+            colorCount: e.data.stats.colorCount,
+            pathCount: e.data.stats.pathCount,
+            durationMs: e.data.stats.durationMs,
+            engine: 'Vectorisation IA HD',
+          });
         } else {
-          setErrorMessage(e.data.error || 'Erreur de vectorisation VTracer');
+          setErrorMessage(e.data.error || 'Erreur lors de la conversion Image to Vector');
         }
       };
     }
@@ -57,7 +62,7 @@ export default function VectorizerTool() {
     };
   }, []);
 
-  const runVTracerVectorization = useCallback((file: File, colorsCountVal?: number, noiseVal?: number, precVal?: number) => {
+  const runVectorization = useCallback((file: File, colorsCountVal?: number, noiseVal?: number, precVal?: number) => {
     setErrorMessage(null);
 
     if (file.size > 50 * 1024 * 1024) {
@@ -111,13 +116,13 @@ export default function VectorizerTool() {
         });
       } else {
         setIsProcessing(false);
-        setErrorMessage('Worker VTracer non disponible');
+        setErrorMessage('Module de conversion indisponible');
       }
     };
 
     img.onerror = () => {
       setIsProcessing(false);
-      setErrorMessage('Impossible de lire la carte d\'image');
+      setErrorMessage('Impossible de lire l\'image');
     };
 
     img.src = objectUrl;
@@ -127,7 +132,7 @@ export default function VectorizerTool() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setOriginalFile(file);
-      runVTracerVectorization(file);
+      runVectorization(file);
     }
   };
 
@@ -136,7 +141,7 @@ export default function VectorizerTool() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setOriginalFile(file);
-      runVTracerVectorization(file);
+      runVectorization(file);
     }
   };
 
@@ -146,7 +151,7 @@ export default function VectorizerTool() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `VXEL_VTracer_${Date.now()}.svg`;
+    a.download = `VXEL_ImageToVector_${Date.now()}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -166,7 +171,7 @@ export default function VectorizerTool() {
       <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase mb-2">
-            <Zap className="w-3.5 h-3.5" /> Moteur Open-Source VTracer Core
+            <Zap className="w-3.5 h-3.5" /> Moteur de Conversion Vectorielle HD
           </div>
           <h2 className="text-2xl font-black text-white">{t('vectorizer.title')}</h2>
           <p className="text-xs text-slate-400 mt-1">{t('vectorizer.sub')}</p>
@@ -174,12 +179,12 @@ export default function VectorizerTool() {
 
         {originalFile && (
           <button
-            onClick={() => runVTracerVectorization(originalFile)}
+            onClick={() => runVectorization(originalFile)}
             disabled={isProcessing}
             className="px-5 py-2.5 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs shadow-lg shadow-[#F7941D]/20 transition-all flex items-center gap-2"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
-            <span>Re-Vectoriser avec VTracer</span>
+            <span>Re-Convertir l'image</span>
           </button>
         )}
       </div>
@@ -200,7 +205,7 @@ export default function VectorizerTool() {
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setNumColors(val);
-              if (originalFile) runVTracerVectorization(originalFile, val, noiseFilter, pathPrecision);
+              if (originalFile) runVectorization(originalFile, val, noiseFilter, pathPrecision);
             }}
             className="w-full accent-[#F7941D]"
           />
@@ -220,7 +225,7 @@ export default function VectorizerTool() {
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setNoiseFilter(val);
-              if (originalFile) runVTracerVectorization(originalFile, numColors, val, pathPrecision);
+              if (originalFile) runVectorization(originalFile, numColors, val, pathPrecision);
             }}
             className="w-full accent-[#F7941D]"
           />
@@ -240,7 +245,7 @@ export default function VectorizerTool() {
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setPathPrecision(val);
-              if (originalFile) runVTracerVectorization(originalFile, numColors, noiseFilter, val);
+              if (originalFile) runVectorization(originalFile, numColors, noiseFilter, val);
             }}
             className="w-full accent-[#F7941D]"
           />
@@ -352,13 +357,13 @@ export default function VectorizerTool() {
               </div>
             </div>
 
-            {/* Après (SVG VTracer HD) */}
+            {/* Après (SVG Image to Vector HD) */}
             <div className="bg-[#161616] border border-[#F7941D]/50 rounded-3xl p-4 flex flex-col justify-between space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
                 <span className="text-xs font-extrabold uppercase text-[#F7941D] tracking-wider">
                   ⚡ {t('vectorizer.after')}
                 </span>
-                <span className="text-[10px] text-green-400 font-mono font-bold">VTracer Core Multicolore</span>
+                <span className="text-[10px] text-green-400 font-mono font-bold">Image to Vector HD</span>
               </div>
 
               <div
@@ -378,7 +383,7 @@ export default function VectorizerTool() {
                   />
                 ) : (
                   <div className="text-xs text-slate-500 font-mono animate-pulse">
-                    Vectorisation VTracer en cours...
+                    Conversion Image to Vector en cours...
                   </div>
                 )}
               </div>

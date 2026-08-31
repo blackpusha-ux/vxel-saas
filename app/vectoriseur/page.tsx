@@ -23,7 +23,7 @@ export default function VectoriseurPage() {
           <Link href="/" className="text-slate-400 hover:text-white text-xs flex items-center gap-1.5 font-bold transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t('common.home')}
           </Link>
-          <span className="text-xs text-slate-500 font-mono">Vectoriseur DTF Pro v2.0 (VTracer)</span>
+          <span className="text-xs text-slate-500 font-mono">Image to Vector Pro v2.0</span>
         </div>
 
         <VectorizerTool />

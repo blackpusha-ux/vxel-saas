@@ -52,7 +52,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
           </Link>
           <Link href="/vectoriseur" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-[#F7941D]" />
-            <span>Vectoriseur Pro</span>
+            <span>{t('nav.imageToVector')}</span>
           </Link>
           <Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-[#F7941D]" />
@@ -119,7 +119,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
             Studio DTF
           </Link>
           <Link href="/vectoriseur" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
-            Vectoriseur Pro
+            Image to Vector
           </Link>
           <Link href="/dtf-planche" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
             Outil Planche DTF

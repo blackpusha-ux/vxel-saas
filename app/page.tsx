@@ -20,8 +20,6 @@ import {
   Sparkle,
   FileCheck,
   Headphones,
-  Check,
-  Star,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -58,12 +56,12 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* 3 Quick Access Tool Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto pt-6 text-left">
-            {/* Tool 1: Studio DTF */}
+          {/* Grid of 3 Aligned Tool Cards (Responsive: 1 col on mobile, 2 on md, 3 on lg) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto pt-6 text-left items-stretch">
+            {/* Card 1: Studio DTF */}
             <Link
               href="/dtf-studio"
-              className="bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/10 group flex flex-col justify-between relative overflow-hidden"
+              className="bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/10 group flex flex-col justify-between relative overflow-hidden h-full"
             >
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-[#F7941D]/10 text-[#F7941D] rounded-2xl flex items-center justify-center border border-[#F7941D]/30 group-hover:scale-110 transition-transform">
@@ -71,24 +69,24 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-2xl font-black text-white group-hover:text-[#F7941D] transition-colors">
-                    Studio DTF
+                    {t('tools.studioTitle')}
                   </h3>
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Détourage intelligent, suppression de fond, anti-halo et préparation professionnelle 300 DPI.
+                    {t('tools.studioDesc')}
                   </p>
                 </div>
               </div>
 
               <div className="pt-8 flex items-center gap-2 text-xs font-black text-[#F7941D] uppercase tracking-wider group-hover:translate-x-1 transition-transform">
-                <span>Ouvrir Studio DTF</span>
+                <span>{t('tools.studioBtn')}</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
 
-            {/* Tool 2: Vectoriseur DTF Pro (VTracer) */}
+            {/* Card 2: Image to Vector */}
             <Link
               href="/vectoriseur"
-              className="bg-[#161616] border border-[#F7941D]/60 hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/20 group flex flex-col justify-between relative overflow-hidden shadow-lg"
+              className="bg-[#161616] border border-[#F7941D]/60 hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/20 group flex flex-col justify-between relative overflow-hidden shadow-lg h-full"
             >
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-[#F7941D] text-black rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-[#F7941D]/30">
@@ -97,28 +95,28 @@ export default function HomePage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-2xl font-black text-white group-hover:text-[#F7941D] transition-colors">
-                      Vectoriseur Pro
+                      {t('tools.imageToVectorTitle')}
                     </h3>
-                    <span className="px-2 py-0.5 bg-[#F7941D]/20 text-[#F7941D] border border-[#F7941D]/40 text-[10px] font-extrabold rounded-full">
-                      VTracer IA
+                    <span className="px-2 py-0.5 bg-[#F7941D]/20 text-[#F7941D] border border-[#F7941D]/40 text-[10px] font-extrabold rounded-full uppercase">
+                      Vector Pro
                     </span>
                   </div>
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Vectorisation multicolore HD sans perte, conversion PNG/JPG en SVG vectoriel lisse pour impression DTF.
+                    {t('tools.imageToVectorDesc')}
                   </p>
                 </div>
               </div>
 
               <div className="pt-8 flex items-center gap-2 text-xs font-black text-[#F7941D] uppercase tracking-wider group-hover:translate-x-1 transition-transform">
-                <span>Vectoriser une image</span>
+                <span>{t('tools.imageToVectorBtn')}</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
 
-            {/* Tool 3: Outil Planche DTF */}
+            {/* Card 3: Outil Planche DTF */}
             <Link
               href="/dtf-planche"
-              className="bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/10 group flex flex-col justify-between relative overflow-hidden"
+              className="bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-[#F7941D]/10 group flex flex-col justify-between relative overflow-hidden h-full"
             >
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-[#F7941D]/10 text-[#F7941D] rounded-2xl flex items-center justify-center border border-[#F7941D]/30 group-hover:scale-110 transition-transform">
@@ -126,16 +124,16 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-2xl font-black text-white group-hover:text-[#F7941D] transition-colors">
-                    Outil Planche DTF
+                    {t('tools.plancheTitle')}
                   </h3>
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Nesting automatique, optimisation film, export PDF / DTX prêt à imprimer.
+                    {t('tools.plancheDesc')}
                   </p>
                 </div>
               </div>
 
               <div className="pt-8 flex items-center gap-2 text-xs font-black text-[#F7941D] uppercase tracking-wider group-hover:translate-x-1 transition-transform">
-                <span>Ouvrir Outil Planche</span>
+                <span>{t('tools.plancheBtn')}</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
