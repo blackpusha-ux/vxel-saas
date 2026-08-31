@@ -6,7 +6,6 @@ import Link from 'next/link';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
 
-
 interface FabricSwatch {
   name: string;
   color: string;
@@ -54,10 +53,17 @@ function median(arr: number[]) {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+function countOpaque(data: Uint8ClampedArray) {
+  let count = 0;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 10) count++;
+  }
+  return count;
+}
+
 export default function DTFStudioPage() {
   const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
-  const [activeTab, setActiveTab] = useState<'studio' | 'vectorizer'>('studio');
   const [credits, setCredits] = useState<number | null>(null);
 
   // States UI
@@ -77,10 +83,11 @@ export default function DTFStudioPage() {
   const [fabricName, setFabricName] = useState('Noir');
   const [enableFabricOpt, setEnableFabricOpt] = useState(false);
 
-  // Controls
-  const [bgRemovalMode, setBgRemovalMode] = useState<'auto' | 'picker' | 'click' | 'none'>('auto');
+  // Background Removal Controls
+  const [bgRemovalMode, setBgRemovalMode] = useState<'auto' | 'black' | 'white' | 'both' | 'custom' | 'picker' | 'click' | 'none'>('auto');
   const [customBgColor, setCustomBgColor] = useState('#000000');
   const [bgTolerance, setBgTolerance] = useState(30);
+  const [whiteTolerance, setWhiteTolerance] = useState(35); // Slider Tolérance Blanc pour off-whites & contours
 
   const [erodePixels, setErodePixels] = useState(0);
   const [lumaMode, setLumaMode] = useState<'off' | 'soft' | 'dark' | 'light' | 'auto'>('off');
@@ -204,7 +211,7 @@ export default function DTFStudioPage() {
         refR = median(samples.map((s) => s[0]));
         refG = median(samples.map((s) => s[1]));
         refB = median(samples.map((s) => s[2]));
-      } else if (bgRemovalMode === 'picker') {
+      } else if (bgRemovalMode === 'picker' || bgRemovalMode === 'custom') {
         const rgb = hexToRgb(customBgColor);
         refR = rgb.r;
         refG = rgb.g;
@@ -223,7 +230,7 @@ export default function DTFStudioPage() {
 
       let removedCount = 0;
       if (bgRemovalMode !== 'none') {
-        removedCount = safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, bgRemovalMode);
+        removedCount = safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, bgRemovalMode, whiteTolerance);
       }
 
       const erodeRadius = erodePixels * scale;
@@ -320,6 +327,7 @@ export default function DTFStudioPage() {
     customBgColor,
     clickedBgColor,
     bgTolerance,
+    whiteTolerance,
     erodePixels,
     enableFillHoles,
     fillHolesSize,
@@ -698,42 +706,37 @@ export default function DTFStudioPage() {
               />
             )}
 
-            <canvas
-              ref={canvasRef}
-              onClick={handleCanvasClick}
-              className="max-w-full max-h-full object-contain relative z-10 cursor-crosshair"
-            />
-
-            {!originalImage && (
-              <div className="text-[#9C9C9C] text-sm absolute z-0 text-center p-4">
-                <p className="font-bold text-[#F7941D] mb-2">{t('studioPage.readyToOptimize')}</p>
+            {!originalImage ? (
+              <div className="text-center text-gray-500 p-4">
+                <p className="text-sm font-bold text-[#F7941D] mb-1">{t('studioPage.readyToOptimize')}</p>
                 <p className="text-xs">{t('studioPage.stepsGuide')}</p>
               </div>
-            )}
-
-            <div className="absolute bottom-2 left-2 bg-[#0A0A0A]/90 border border-[#F7941D] text-[#FFD9A8] text-[10px] px-2 py-0.5 rounded z-20">
-              {dimensionText}
-            </div>
-            <div className="absolute top-2 left-2 bg-[#0A0A0A]/90 border border-[#F7941D] text-[#FFD9A8] text-[10px] px-2 py-0.5 rounded z-20">
-              👕 {fabricName}
-            </div>
-            {awaitingClickColor && (
-              <div className="absolute top-2 text-[10px] text-[#FFD9A8] bg-[#0A0A0A]/90 px-2 py-0.5 rounded border border-[#F7941D] z-20">
-                {t('studioPage.clickBgPrompt')}
-              </div>
-            )}
-            {perfText && (
-              <div className="absolute top-2 right-2 text-[10px] text-[#9C9C9C] bg-[#0A0A0A]/90 px-2 py-0.5 rounded border border-[#2E2E2E] z-20">
-                {perfText}
-              </div>
+            ) : (
+              <canvas
+                ref={canvasRef}
+                onClick={handleCanvasClick}
+                className={`max-h-[500px] max-w-full object-contain ${
+                  bgRemovalMode === 'click' && awaitingClickColor ? 'cursor-crosshair border-2 border-dashed border-[#F7941D]' : ''
+                }`}
+              />
             )}
           </div>
 
-          <div className="px-3 py-2 border-t border-[#2E2E2E] flex flex-col sm:flex-row gap-2">
+          <div className="px-3 py-2 border-t border-[#2E2E2E] bg-[#111] flex flex-col gap-1 text-[11px] text-gray-400">
+            <div className="flex justify-between items-center">
+              <span>{dimensionText}</span>
+              <span className="text-[#F7941D] font-bold">{perfText}</span>
+            </div>
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="truncate">{debugText}</span>
+            </div>
+          </div>
+
+          <div className="p-3 border-t border-[#2E2E2E] bg-[#161616] flex gap-2">
             <button
               onClick={() => handleDownload('color')}
               disabled={!originalImage}
-              className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs"
+              className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs shadow-lg shadow-[#F7941D]/10"
             >
               {t('studioPage.pngColorBtn')}
             </button>
@@ -784,7 +787,7 @@ export default function DTFStudioPage() {
                 />
               </div>
             )}
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 mb-2 text-xs">
               <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.toleranceLabel')}</label>
               <input
                 type="range"
@@ -796,6 +799,23 @@ export default function DTFStudioPage() {
               />
               <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{bgTolerance}</span>
             </div>
+
+            {/* Slider spécifique Tolérance Blanc (Off-whites & anti-aliasing) */}
+            {(bgRemovalMode === 'auto' || bgRemovalMode === 'white' || bgRemovalMode === 'both') && (
+              <div className="flex items-center gap-2 text-xs">
+                <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.whiteToleranceLabel')}</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="80"
+                  value={whiteTolerance}
+                  onChange={(e) => setWhiteTolerance(parseInt(e.target.value))}
+                  className="flex-1 accent-[#F7941D]"
+                />
+                <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{whiteTolerance}%</span>
+              </div>
+            )}
+
             {debugText && <div className="text-[10px] text-[#FFB25A] mt-1">📊 {debugText}</div>}
           </div>
 
@@ -944,183 +964,47 @@ export default function DTFStudioPage() {
               <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{boostCon}</span>
             </div>
           </div>
-
-          {/* Finitions */}
-          <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
-            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              ✨ Finitions
-            </h3>
-            <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="flex items-center gap-1 text-[#9C9C9C] text-[11px] w-24 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableHalftone}
-                  onChange={(e) => setEnableHalftone(e.target.checked)}
-                  className="accent-[#F7941D]"
-                />
-                Halftone
-              </label>
-              <input
-                type="range"
-                min="3"
-                max="15"
-                value={dotSize}
-                onChange={(e) => setDotSize(parseInt(e.target.value))}
-                className="flex-1 accent-[#F7941D]"
-              />
-              <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{dotSize}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <label className="flex items-center gap-1 text-[#9C9C9C] text-[11px] w-24 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableGrunge}
-                  onChange={(e) => setEnableGrunge(e.target.checked)}
-                  className="accent-[#F7941D]"
-                />
-                Grunge
-              </label>
-              <input
-                type="range"
-                min="10"
-                max="70"
-                value={grungeIntensity}
-                onChange={(e) => setGrungeIntensity(parseInt(e.target.value))}
-                className="flex-1 accent-[#F7941D]"
-              />
-              <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{grungeIntensity}</span>
-            </div>
-          </div>
         </div>
 
-        {/* Colonne 3 : Tissu & Dimensions */}
-        <div className="col-span-12 lg:col-span-3 overflow-y-auto max-h-[calc(100vh-120px)] pr-1 flex flex-col gap-2">
-          {/* Couleur tissu */}
-          <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
-            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              👕 Couleur tissu
+        {/* Colonne 3 : Swatches & Paramètres Tissu */}
+        <div className="col-span-12 lg:col-span-3 bg-[#161616] border border-[#2E2E2E] rounded-lg p-3 overflow-y-auto max-h-[calc(100vh-120px)] flex flex-col gap-3">
+          <div>
+            <h3 className="text-xs font-bold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
+              {t('studioPage.fabricColorSection')}
             </h3>
-            <div className="grid grid-cols-8 gap-1 mb-2">
-              {FABRIC_SWATCHES.map((sw) => (
+            <div className="text-xs font-bold text-white mb-2 flex justify-between">
+              <span>Sélectionné :</span>
+              <span className="text-[#F7941D]">{fabricName}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {FABRIC_SWATCHES.map((s) => (
                 <button
-                  key={sw.name}
-                  onClick={() => handleSetFabricColor(sw.color, sw.name)}
-                  style={{ backgroundColor: sw.color }}
-                  title={sw.name}
-                  className={`w-full aspect-square rounded border transition-all ${
-                    fabricColor.toLowerCase() === sw.color.toLowerCase()
-                      ? 'border-[#F7941D] scale-110 shadow-lg'
-                      : 'border-[#2E2E2E]'
+                  key={s.color}
+                  onClick={() => handleSetFabricColor(s.color, s.name)}
+                  title={s.name}
+                  className={`h-8 rounded border transition-transform flex items-center justify-center text-[10px] ${
+                    fabricColor.toLowerCase() === s.color.toLowerCase()
+                      ? 'border-[#F7941D] scale-105 shadow-md shadow-[#F7941D]/20'
+                      : 'border-[#2E2E2E] hover:scale-100'
                   }`}
-                />
+                  style={{ backgroundColor: s.color }}
+                >
+                  {s.color === '#ffffff' && <span className="text-black text-[9px] font-bold">W</span>}
+                </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 mb-2">
-              <input
-                type="color"
-                value={fabricColor}
-                onChange={(e) => handleSetFabricColor(e.target.value)}
-                className="w-8 h-6 rounded border border-[#2E2E2E] cursor-pointer bg-transparent"
-              />
-              <input
-                type="text"
-                value={fabricColor}
-                onChange={(e) => {
-                  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
-                    handleSetFabricColor(e.target.value);
-                  }
-                }}
-                className="bg-[#0A0A0A] border border-[#2E2E2E] text-white text-xs rounded px-2 py-1 flex-1 font-mono"
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <label className="text-gray-300 font-semibold cursor-pointer">Auto-optim</label>
+          </div>
+
+          <div className="mt-2 pt-2 border-t border-[#2E2E2E]">
+            <label className="flex items-center gap-1.5 text-xs text-[#9C9C9C] cursor-pointer">
               <input
                 type="checkbox"
                 checked={enableFabricOpt}
                 onChange={(e) => setEnableFabricOpt(e.target.checked)}
                 className="accent-[#F7941D]"
               />
-            </div>
-          </div>
-
-          {/* Upscale & Dimensions */}
-          <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
-            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              📐 Upscale & Dimensions
-            </h3>
-            <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Upscale</label>
-              <select
-                value={scaleFactor}
-                onChange={(e) => setScaleFactor(parseInt(e.target.value))}
-                className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
-              >
-                <option value="1">1x</option>
-                <option value="2">2x</option>
-                <option value="3">3x</option>
-                <option value="4">4x</option>
-              </select>
-              <span className="text-[#FFB25A] font-bold text-xs">{scaleFactor}x</span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs mb-2">
-              <label className="text-gray-300 font-semibold cursor-pointer">Recadrage auto</label>
-              <input
-                type="checkbox"
-                checked={enableCrop}
-                onChange={(e) => setEnableCrop(e.target.checked)}
-                className="accent-[#F7941D]"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Redimension</label>
-              <select
-                value={fitMode}
-                onChange={(e) => setFitMode(e.target.value as any)}
-                className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
-              >
-                <option value="tight">🎯 Ajusté au design</option>
-                <option value="frame">⬜ Cadre fixe (marges)</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div>
-                <label className="block text-[10px] text-[#9C9C9C] mb-0.5">Largeur max (cm)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={targetWidthCm}
-                  onChange={(e) => setTargetWidthCm(parseFloat(e.target.value) || 29)}
-                  className="w-full bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-[#9C9C9C] mb-0.5">Hauteur max (cm)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={targetHeightCm}
-                  onChange={(e) => setTargetHeightCm(parseFloat(e.target.value) || 34)}
-                  className="w-full bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 text-xs"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Astuce Pro */}
-          <div className="bg-gradient-to-br from-[#F7941D]/10 to-[#0A0A0A] border border-[#F7941D]/30 rounded-lg p-2.5">
-            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#F7941D]/30 pb-1 mb-2">
-              💡 Astuce Pro
-            </h3>
-            <p className="text-[10px] text-[#9C9C9C] leading-relaxed">
-              <span className="text-[#F7941D] font-bold">Couleurs délavées ?</span> cochez <b>💪 Renforcer</b>.<br />
-              <span className="text-[#F7941D] font-bold">T-shirt noir :</span> Luma <b>Off</b> + fond <b>Auto</b> + <b>Reboucher les trous</b>.
-            </p>
+              <span>{t('studioPage.fabricOptCheck')}</span>
+            </label>
           </div>
         </div>
       </div>
@@ -1128,12 +1012,9 @@ export default function DTFStudioPage() {
   );
 }
 
-// Helpers de traitement Canvas
-function countOpaque(data: Uint8ClampedArray) {
-  let c = 0;
-  for (let i = 3; i < data.length; i += 4) if (data[i] > 0) c++;
-  return c;
-}
+/* ========================================================================
+   FUNCTIONS DE TRAITEMENT D'IMAGE & ANTI-HALO SUPPRESSION DUAL (NOIR/BLANC)
+   ======================================================================== */
 
 function safeBackgroundRemoval(
   data: Uint8ClampedArray,
@@ -1143,11 +1024,14 @@ function safeBackgroundRemoval(
   refG: number,
   refB: number,
   toleranceVal: number,
-  mode: string = 'auto'
+  mode: string = 'auto',
+  whiteTolVal: number = 35
 ) {
   const n = w * h;
-  const tolBlack = toleranceVal * 3;
-  const tolWhite = Math.max(40, toleranceVal) * 3.5;
+  const tolBlack = toleranceVal * 3.2;
+  const tolWhite = Math.max(40, whiteTolVal) * 3.8;
+  const minWhiteRGB = Math.max(180, 255 - Math.round(whiteTolVal * 0.9));
+  const minWhiteLum = Math.max(0.72, 1.0 - (whiteTolVal / 100) * 0.3);
 
   // 1. Analyze 4 corners to detect background colors in 'auto' mode
   const cornerIndices = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + (w - 1)) * 4];
@@ -1157,9 +1041,11 @@ function safeBackgroundRemoval(
   cornerIndices.forEach((idx) => {
     const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
     if (a < 10) return;
-    const lum = (Math.max(r, g, b) + Math.min(r, g, b)) / 510; // HSL Luminance
-    if (r <= 35 && g <= 35 && b <= 35) hasBlackCorner = true;
-    if (r >= 210 && g >= 210 && b >= 210 && lum > 0.85) hasWhiteCorner = true;
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const lum = (maxC + minC) / 510;
+    if (r <= 40 && g <= 40 && b <= 40) hasBlackCorner = true;
+    if (r >= 200 && g >= 200 && b >= 200 && lum > 0.80) hasWhiteCorner = true;
   });
 
   const removeBlack = mode === 'black' || mode === 'both' || (mode === 'auto' && hasBlackCorner);
@@ -1170,18 +1056,21 @@ function safeBackgroundRemoval(
     const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
     if (a === 0) return false;
 
-    // Check Black (RGB 0-30 or Manhattan distance)
+    // Check Black (RGB 0-40 or Manhattan distance)
     if (removeBlack) {
-      if (r <= 35 && g <= 35 && b <= 35) return true;
+      if (r <= 40 && g <= 40 && b <= 40) return true;
       if (colorDistManhattan(r, g, b, 0, 0, 0) <= tolBlack) return true;
     }
 
-    // Check White (RGB 225-255 or HSL Lum > 95%)
+    // Check White & Off-Whites (#F8F8F8, #F0F0F0, HSL Lum > 82%, low color saturation)
     if (removeWhite) {
       const maxC = Math.max(r, g, b);
       const minC = Math.min(r, g, b);
       const lum = (maxC + minC) / 510;
-      if (r >= 215 && g >= 215 && b >= 215 && lum >= 0.92) return true;
+      const satDiff = maxC - minC; // Pure/off-whites have low saturation difference
+
+      if (r >= minWhiteRGB && g >= minWhiteRGB && b >= minWhiteRGB && satDiff <= 25) return true;
+      if (lum >= minWhiteLum && satDiff <= 30) return true;
       if (colorDistManhattan(r, g, b, 255, 255, 255) <= tolWhite) return true;
     }
 
@@ -1198,7 +1087,8 @@ function safeBackgroundRemoval(
   let qt = 0;
   let qh = 0;
 
-  // Flood fill initialization from border pixels (4 corners & perimeter)
+  // Flood fill initialization strictly from outer border pixels (4 corners & perimeter)
+  // This guarantees that white text or white graphics inside the design center are NEVER reached!
   for (let x = 0; x < w; x++) {
     const p1 = x;
     if (matchColor(p1 * 4) && !bg[p1]) {
@@ -1249,6 +1139,38 @@ function safeBackgroundRemoval(
       removed++;
     }
   }
+
+  // 2. Post-processing: Anti-aliasing fringe cleanup along perimeter borders
+  // Fades out semi-transparent gray/white halos adjacent to removed background
+  if (removeWhite || removeBlack) {
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (data[i * 4 + 3] === 0) continue;
+
+        // Check if adjacent to background
+        const isBorder =
+          data[(i - 1) * 4 + 3] === 0 ||
+          data[(i + 1) * 4 + 3] === 0 ||
+          data[(i - w) * 4 + 3] === 0 ||
+          data[(i + w) * 4 + 3] === 0;
+
+        if (isBorder) {
+          const r = data[i * 4];
+          const g = data[i * 4 + 1];
+          const b = data[i * 4 + 2];
+          const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+
+          // If white background was removed and edge pixel is a light anti-aliased gray halo
+          if (removeWhite && lum > 0.65) {
+            const fade = Math.max(0, 1 - (lum - 0.65) / 0.35);
+            data[i * 4 + 3] = Math.round(data[i * 4 + 3] * fade);
+          }
+        }
+      }
+    }
+  }
+
   return removed;
 }
 
