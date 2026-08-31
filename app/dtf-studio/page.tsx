@@ -586,7 +586,7 @@ export default function DTFStudioPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
           <div className="flex items-center gap-3">
             <Link href="/" className="text-[#F7941D] hover:underline text-xs font-bold">
-              ← Accueil
+              ← {t('common.home')}
             </Link>
             <h1 className="text-base font-extrabold text-white leading-none">
               VXEL <span className="text-[#F7941D]">DTF Studio Pro</span>
@@ -597,7 +597,7 @@ export default function DTFStudioPage() {
               htmlFor="imageLoader"
               className="bg-[#1F1F1F] text-white border border-[#2E2E2E] hover:border-[#F7941D] hover:text-[#FFB25A] px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer flex items-center gap-2 w-full sm:w-auto justify-center"
             >
-              📁 Charger une image
+              {t('studioPage.uploadImg')}
             </label>
             <input type="file" id="imageLoader" accept="image/*" className="hidden" onChange={handleImageChange} />
           </div>
@@ -608,13 +608,13 @@ export default function DTFStudioPage() {
           {isLoaded && isSignedIn && (
             <div className="flex items-center gap-2">
               <span className="bg-[#0A0A0A] border border-[#F7941D] text-[#FFD9A8] px-3 py-1 rounded-lg text-xs font-extrabold">
-                {credits !== null ? credits : '...'} crédits
+                {credits !== null ? credits : '...'} {t('common.credits')}
               </span>
               <button
                 onClick={() => setShowPackModal(true)}
                 className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] px-3 py-1 rounded-md text-[10px]"
               >
-                ➕ Acheter
+                {t('common.buyBtn')}
               </button>
               <UserButton />
             </div>
@@ -622,7 +622,7 @@ export default function DTFStudioPage() {
           {isLoaded && !isSignedIn && (
             <SignInButton mode="modal">
               <button className="bg-[#F7941D] text-black px-4 py-1.5 rounded-md text-xs font-bold hover:bg-[#FFB25A]">
-                Se connecter
+                {t('common.signIn')}
               </button>
             </SignInButton>
           )}
@@ -634,7 +634,7 @@ export default function DTFStudioPage() {
         {/* Colonne 1 : Prévisualisation */}
         <div className="col-span-12 lg:col-span-5 bg-[#161616] border border-[#2E2E2E] rounded-lg flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-[#2E2E2E]">
-            <h3 className="text-xs font-bold text-[#F7941D] uppercase tracking-wide">👁️ Prévisualisation</h3>
+            <h3 className="text-xs font-bold text-[#F7941D] uppercase tracking-wide">{t('studioPage.previewTitle')}</h3>
             <div className="flex gap-1">
               <button
                 onClick={() => setBgView('fabric')}
@@ -704,8 +704,8 @@ export default function DTFStudioPage() {
 
             {!originalImage && (
               <div className="text-[#9C9C9C] text-sm absolute z-0 text-center p-4">
-                <p className="font-bold text-[#F7941D] mb-2">Prêt à optimiser ?</p>
-                <p className="text-xs">1. Charger une image → 2. Ajuster les filtres → 3. Télécharger</p>
+                <p className="font-bold text-[#F7941D] mb-2">{t('studioPage.readyToOptimize')}</p>
+                <p className="text-xs">{t('studioPage.stepsGuide')}</p>
               </div>
             )}
 
@@ -717,7 +717,7 @@ export default function DTFStudioPage() {
             </div>
             {awaitingClickColor && (
               <div className="absolute top-2 text-[10px] text-[#FFD9A8] bg-[#0A0A0A]/90 px-2 py-0.5 rounded border border-[#F7941D] z-20">
-                Cliquez sur le fond pour sélectionner la couleur
+                {t('studioPage.clickBgPrompt')}
               </div>
             )}
             {perfText && (
@@ -733,14 +733,14 @@ export default function DTFStudioPage() {
               disabled={!originalImage}
               className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs"
             >
-              📥 PNG Couleur
+              {t('studioPage.pngColorBtn')}
             </button>
             <button
               onClick={() => handleDownload('white')}
               disabled={!originalImage}
               className="bg-[#1F1F1F] text-white border border-[#2E2E2E] hover:border-[#F7941D] hover:text-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs font-bold"
             >
-              ⚪ White Base
+              {t('studioPage.whiteBaseBtn')}
             </button>
           </div>
         </div>
@@ -750,10 +750,10 @@ export default function DTFStudioPage() {
           {/* Suppression du fond */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
             <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              Suppression du fond
+              {t('studioPage.removeBgSection')}
             </h3>
             <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Méthode</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.methodLabel')}</label>
               <select
                 value={bgRemovalMode}
                 onChange={(e) => {
@@ -764,15 +764,15 @@ export default function DTFStudioPage() {
                 }}
                 className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
               >
-                <option value="auto">Auto (coins)</option>
-                <option value="picker">Manuelle</option>
-                <option value="click">Pipette</option>
-                <option value="none">Aucune</option>
+                <option value="auto">{t('studioPage.methodAuto')}</option>
+                <option value="picker">{t('studioPage.methodPicker')}</option>
+                <option value="click">{t('studioPage.methodClick')}</option>
+                <option value="none">{t('studioPage.methodNone')}</option>
               </select>
             </div>
             {bgRemovalMode === 'picker' && (
               <div className="flex items-center gap-2 mb-2 text-xs">
-                <label className="w-20 text-[#9C9C9C] text-[11px]">Couleur</label>
+                <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.colorLabel')}</label>
                 <input
                   type="color"
                   value={customBgColor}
@@ -782,7 +782,7 @@ export default function DTFStudioPage() {
               </div>
             )}
             <div className="flex items-center gap-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Tolérance</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.toleranceLabel')}</label>
               <input
                 type="range"
                 min="0"
@@ -799,10 +799,10 @@ export default function DTFStudioPage() {
           {/* Anti-halo & Luma Key */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
             <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              🛡️ Anti-halo & Luma Key
+              {t('studioPage.antiHaloSection')}
             </h3>
             <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Choke</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.chokeLabel')}</label>
               <input
                 type="range"
                 min="0"
@@ -814,21 +814,21 @@ export default function DTFStudioPage() {
               <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{erodePixels}</span>
             </div>
             <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Mode Luma</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.lumaModeLabel')}</label>
               <select
                 value={lumaMode}
                 onChange={(e) => setLumaMode(e.target.value as any)}
                 className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
               >
-                <option value="off">Off (recommandé t-shirt noir)</option>
-                <option value="soft">🛡️ Doux (fond plat)</option>
-                <option value="dark">Noirs (agressif)</option>
-                <option value="light">Blancs (tissu clair)</option>
-                <option value="auto">Auto (tissu)</option>
+                <option value="off">{t('studioPage.lumaOff')}</option>
+                <option value="soft">{t('studioPage.lumaSoft')}</option>
+                <option value="dark">{t('studioPage.lumaDark')}</option>
+                <option value="light">{t('studioPage.lumaLight')}</option>
+                <option value="auto">{t('studioPage.lumaAuto')}</option>
               </select>
             </div>
             <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Seuil</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.thresholdLabel')}</label>
               <input
                 type="range"
                 min="0"
@@ -840,7 +840,7 @@ export default function DTFStudioPage() {
               <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{lumaT}</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">Douceur</label>
+              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.softnessLabel')}</label>
               <input
                 type="range"
                 min="10"
@@ -856,7 +856,7 @@ export default function DTFStudioPage() {
           {/* Nettoyage contours */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
             <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
-              🧹 Nettoyage contours
+              {t('studioPage.contourCleanSection')}
             </h3>
             <div className="flex items-center gap-2 mb-2 text-xs">
               <label className="flex items-center gap-1 text-[#9C9C9C] text-[11px] w-32 cursor-pointer">
@@ -866,7 +866,7 @@ export default function DTFStudioPage() {
                   onChange={(e) => setEnableFillHoles(e.target.checked)}
                   className="accent-[#F7941D]"
                 />
-                Reboucher les trous
+                {t('studioPage.fillHolesCheck')}
               </label>
               <input
                 type="range"
@@ -886,7 +886,7 @@ export default function DTFStudioPage() {
                   onChange={(e) => setEnableDefringe(e.target.checked)}
                   className="accent-[#F7941D]"
                 />
-                Nettoyer frange
+                {t('studioPage.defringeCheck')}
               </label>
               <input
                 type="range"
