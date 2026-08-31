@@ -4,8 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function PrivacyPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-slate-200 font-sans selection:bg-[#F7941D] selection:text-black">
       <header className="max-w-7xl mx-auto flex justify-between items-center py-6 px-4 border-b border-[#2E2E2E]">
@@ -16,15 +19,15 @@ export default function PrivacyPage() {
         <div className="flex items-center gap-4">
           <LanguageCurrencySelector />
           <Link href="/" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> Accueil
+            <ArrowLeft className="w-4 h-4" /> {t('common.home')}
           </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-16 space-y-8">
         <div className="border-b border-[#2E2E2E] pb-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">Politique de Confidentialité</h1>
-          <p className="text-xs text-slate-400">Dernière mise à jour : {new Date().toLocaleDateString('fr-FR')}</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">{t('legal.privacyTitle')}</h1>
+          <p className="text-xs text-slate-400">{t('legal.lastUpdate')} {new Date().toLocaleDateString()}</p>
         </div>
 
         <section className="space-y-6 text-xs leading-relaxed text-slate-300">
@@ -52,7 +55,7 @@ export default function PrivacyPage() {
       </main>
 
       <footer className="max-w-7xl mx-auto text-center py-8 border-t border-[#2E2E2E] text-xs text-slate-600">
-        © {new Date().getFullYear()} VXEL DTF Studio Pro. Tous droits réservés.
+        © {new Date().getFullYear()} VXEL DTF Studio Pro. {t('footer.rights')}
       </footer>
     </div>
   );

@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Globe, ChevronDown, Check } from 'lucide-react';
-import { Locale } from '@/lib/i18n';
+import { Language } from '@/lib/i18n/dictionary';
 import { CurrencyCode, currencies } from '@/lib/currencies';
-import { useTranslation } from '@/lib/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAppContext } from '@/contexts/AppContext';
 
-const languagesList: { code: Locale; name: string; flag: string }[] = [
+const languagesList: { code: Language; name: string; flag: string }[] = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'es', name: 'Español', flag: '🇪🇸' },
@@ -23,7 +23,7 @@ const currenciesList: { code: CurrencyCode; symbol: string; name: string }[] = [
 ];
 
 export default function LanguageCurrencySelector({ isMobile = false }: { isMobile?: boolean }) {
-  const { lang, setLang } = useTranslation();
+  const { lang, setLanguage } = useTranslation();
   const { currency, setCurrency } = useCurrency();
   const { setCurrency: setAppCurrency } = useAppContext();
 
@@ -41,10 +41,8 @@ export default function LanguageCurrencySelector({ isMobile = false }: { isMobil
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectLang = (newLang: Locale) => {
-    setLang(newLang);
-    localStorage.setItem('vexel_lang', newLang);
-    localStorage.setItem('vxel_lang', newLang);
+  const handleSelectLang = (newLang: Language) => {
+    setLanguage(newLang);
     setIsOpen(false);
   };
 
@@ -62,9 +60,9 @@ export default function LanguageCurrencySelector({ isMobile = false }: { isMobil
   if (isMobile) {
     return (
       <div className="space-y-4 p-3 bg-[#161616] border border-[#2E2E2E] rounded-xl">
-        {/* Mobile Languages: 3 horizontal buttons with flags */}
+        {/* Mobile Languages: 3 horizontal flag buttons */}
         <div>
-          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Langue</div>
+          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Langue / Language</div>
           <div className="grid grid-cols-3 gap-2">
             {languagesList.map((item) => {
               const isSelected = item.code === lang;
@@ -86,9 +84,9 @@ export default function LanguageCurrencySelector({ isMobile = false }: { isMobil
           </div>
         </div>
 
-        {/* Mobile Currencies: horizontal scroll list */}
+        {/* Mobile Currencies: discrete horizontal scroll */}
         <div>
-          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Devise</div>
+          <div className="text-[11px] font-bold uppercase text-[#F7941D] tracking-wider mb-2">Devise / Currency</div>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {currenciesList.map((item) => {
               const isSelected = item.code === currency;

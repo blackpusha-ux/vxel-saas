@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useUser, UserButton } from '@clerk/nextjs';
-import { Check, Zap, ArrowRight, ShieldCheck, Lock, RotateCcw, HelpCircle } from 'lucide-react';
+import { Check, Zap, ArrowRight, ShieldCheck, Lock, RotateCcw } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { useTranslation } from '@/lib/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPriceInCurrency, formatPrice } from '@/lib/pricing';
 
@@ -43,7 +43,7 @@ export default function PricingPage() {
 
       const data = await res.json();
       if (data.success) {
-        setToastMessage(`✅ ${creditsAmount} crédits ajoutés à votre compte !`);
+        setToastMessage(`✅ ${creditsAmount} ${t('common.credits')} ${t('pricing.addedSuccess') || 'ajoutés !'}`);
         await refreshCredits();
         setTimeout(() => setToastMessage(null), 4000);
       } else {
@@ -56,51 +56,50 @@ export default function PricingPage() {
     }
   };
 
-  // Rounded professional B2B prices
   const plans = [
     {
       key: 'free',
-      name: t.plans.free,
+      name: t('plans.free') || 'Gratuit',
       cadPrice: 0,
       credits: 5,
-      creditsLabel: '5 crédits / mois',
-      description: 'Idéal pour tester nos outils DTF et faire un essai gratuit.',
-      features: ['5 crédits offerts par mois', 'Accès à VXEL Studio Pro', 'Accès à l\'Outil Planche', 'Support communautaire'],
-      cta: 'Commencer gratuitement',
+      creditsLabel: `5 ${t('common.credits')} ${t('common.perMonth')}`,
+      description: t('pricing.freeDesc'),
+      features: [`5 ${t('common.credits')} / mois`, `Accès ${t('common.studio')}`, `Accès ${t('common.planche')}`, 'Support'],
+      cta: t('common.choose'),
       highlighted: false,
     },
     {
       key: 'starter',
-      name: t.plans.starter,
+      name: t('plans.starter') || 'Starter',
       cadPrice: 19,
       credits: 100,
-      creditsLabel: '100 crédits / mois',
-      description: 'Pour les créateurs et indépendants lançant leurs impressions.',
-      features: ['100 crédits d\'impression par mois', 'Détourage IA & Anti-halo', 'Exports HD (300 DPI)', 'Support email sous 24h'],
-      cta: 'Choisir Starter',
+      creditsLabel: `100 ${t('common.credits')} ${t('common.perMonth')}`,
+      description: t('pricing.starterDesc'),
+      features: [`100 ${t('common.credits')} / mois`, 'Détourage IA & Anti-halo', 'Export HD 300 DPI', 'Support 24h'],
+      cta: t('common.choose'),
       highlighted: false,
     },
     {
       key: 'pro',
-      name: t.plans.pro,
+      name: t('plans.pro') || 'Pro',
       cadPrice: 39,
       credits: 500,
-      creditsLabel: '500 crédits / mois',
-      description: 'Pour les ateliers et imprimeurs DTF professionnels.',
-      badge: t.popular,
-      features: ['500 crédits d\'impression par mois', 'Accès prioritaire Outil Planche', 'Nesting automatique multi-images', 'Support prioritaire 7j/7'],
-      cta: 'Passer en Pro',
+      creditsLabel: `500 ${t('common.credits')} ${t('common.perMonth')}`,
+      description: t('pricing.proDesc'),
+      badge: t('common.popular'),
+      features: [`500 ${t('common.credits')} / mois`, `Accès prioritaire ${t('common.planche')}`, 'Nesting automatique', 'Support prioritaire 7j/7'],
+      cta: t('common.choose'),
       highlighted: true,
     },
     {
       key: 'enterprise',
-      name: t.plans.enterprise,
+      name: t('plans.enterprise') || 'Enterprise',
       cadPrice: 99,
       credits: 2000,
-      creditsLabel: t.unlimited,
-      description: 'Pour les gros volumes d\'impression et réseaux d\'ateliers.',
-      features: ['Crédits illimités (2000+)', 'API d\'intégration sur-mesure', 'Manager de compte dédié', 'Garantie SLA 99.9%'],
-      cta: 'Contacter l\'équipe',
+      creditsLabel: t('common.unlimited'),
+      description: t('pricing.enterpriseDesc'),
+      features: [`${t('common.unlimited')} (2000+)`, 'API sur-mesure', 'Manager dédié', 'Garantie SLA 99.9%'],
+      cta: t('common.choose'),
       highlighted: false,
     },
   ];
@@ -115,8 +114,8 @@ export default function PricingPage() {
   const faqs = [
     { q: 'Comment fonctionnent les crédits ?', a: 'Chaque optimisation d\'image ou création de planche consommée équivaut à 1 crédit.' },
     { q: 'Quelle est la différence entre abonnement et packs ?', a: 'Les crédits de votre abonnement se renouvellent chaque mois. Les crédits achetés en pack n\'expirent jamais.' },
-    { q: 'Puis-je changer de forfait à tout moment ?', a: 'Oui, vous pouvez surclasser ou suspendre votre abonnement à tout moment sans frais.' },
-    { q: 'Quel format de fichier puis-je exporter ?', a: 'Export PNG transparent haute définition et PDF vectoriel prêt pour les logiciels RIP DTF.' },
+    { q: 'Puis-je changer de forfait à tout moment ?', a: 'Oui, vous pouvez surclasser votre abonnement à tout moment sans frais.' },
+    { q: 'Quel format de fichier puis-je exporter ?', a: 'Vous pouvez exporter au format PNG haute définition avec transparence et PDF vectoriel.' },
   ];
 
   return (
@@ -141,12 +140,12 @@ export default function PricingPage() {
               <UserButton />
               <div className="bg-[#161616] border border-[#F7941D] px-3 py-1.5 rounded-full text-xs font-extrabold text-[#F7941D] flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5" />
-                <span>{userCredits !== null ? userCredits : '...'} {t.credits}</span>
+                <span>{userCredits !== null ? userCredits : '...'} {t('common.credits')}</span>
               </div>
             </div>
           ) : (
             <Link href="/sign-in" className="px-4 py-2 bg-[#F7941D] text-black rounded-lg font-bold text-xs hover:bg-[#FFB25A]">
-              {t.signIn}
+              {t('common.signIn')}
             </Link>
           )}
         </div>
@@ -155,27 +154,24 @@ export default function PricingPage() {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-16 space-y-16">
         <div className="text-center max-w-3xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase tracking-wider">
-            <Zap className="w-4 h-4" /> {t.pricingTitle}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase mb-4">
+            <Zap className="w-4 h-4" /> {t('pricing.title')}
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight">
-            Tarification transparente <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F7941D] to-[#FFB25A]">
-              sans mauvaise surprise
-            </span>
+            {t('pricing.title')}
           </h1>
           <p className="text-slate-400 text-sm md:text-base">
-            {t.pricingSub}
+            {t('pricing.sub')}
           </p>
 
           {/* Encart explicatif Modèle Hybride */}
           <div className="p-4 bg-[#161616] border border-[#2E2E2E] rounded-2xl text-xs text-slate-300 max-w-2xl mx-auto text-left leading-relaxed">
-            {t.hybridModelInfo}
+            {t('pricing.hybridInfo')}
           </div>
 
           {/* Toggle Monthly / Annual */}
           <div className="pt-4 flex items-center justify-center gap-4">
-            <span className={`text-xs font-bold ${!isAnnual ? 'text-white' : 'text-slate-400'}`}>{t.monthly}</span>
+            <span className={`text-xs font-bold ${!isAnnual ? 'text-white' : 'text-slate-400'}`}>{t('pricing.monthly') || 'Mensuel'}</span>
             <button
               onClick={() => setIsAnnual(!isAnnual)}
               className="relative w-12 h-6 bg-[#161616] border border-[#2E2E2E] rounded-full p-0.5 transition-colors"
@@ -183,7 +179,7 @@ export default function PricingPage() {
               <div className={`w-5 h-5 bg-[#F7941D] rounded-full transition-transform ${isAnnual ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
             <span className={`text-xs font-bold flex items-center gap-1 ${isAnnual ? 'text-white' : 'text-slate-400'}`}>
-              {t.annual}
+              {t('pricing.annual') || 'Annuel (-20%)'}
             </span>
           </div>
         </div>
@@ -214,9 +210,9 @@ export default function PricingPage() {
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-extrabold text-white font-mono">{formattedPrice}</span>
-                      {plan.cadPrice > 0 && <span className="text-xs text-slate-400 font-medium">{t.perMonth}</span>}
+                      {plan.cadPrice > 0 && <span className="text-xs text-slate-400 font-medium">{t('common.perMonth')}</span>}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">{t.taxIncluded}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">{t('common.taxIncluded')}</div>
                     <div className="text-xs font-bold text-[#F7941D] mt-2">{plan.creditsLabel}</div>
                   </div>
 
@@ -250,8 +246,8 @@ export default function PricingPage() {
         {/* Credit Packs Section */}
         <section className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8">
           <div className="text-center max-w-2xl mx-auto mb-8">
-            <h2 className="text-2xl font-extrabold text-white mb-2">{t.creditPacks}</h2>
-            <p className="text-xs text-slate-400">{t.creditPacksDesc}</p>
+            <h2 className="text-2xl font-extrabold text-white mb-2">{t('pricing.creditPacksTitle')}</h2>
+            <p className="text-xs text-slate-400">{t('pricing.creditPacksSub')}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -268,11 +264,11 @@ export default function PricingPage() {
                 >
                   {pack.bestValue && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F7941D] text-black text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      {t.popular}
+                      {t('common.popular')}
                     </div>
                   )}
                   <div className="text-3xl font-extrabold text-white font-mono mb-1">{pack.credits}</div>
-                  <div className="text-xs font-bold text-slate-400 mb-3">Crédits d'impression</div>
+                  <div className="text-xs font-bold text-slate-400 mb-3">{t('common.credits')}</div>
 
                   {pack.bonus > 0 ? (
                     <div className="inline-block bg-[#F7941D]/10 text-[#F7941D] text-[11px] font-extrabold px-2.5 py-1 rounded-full mb-4">
@@ -283,14 +279,14 @@ export default function PricingPage() {
                   )}
 
                   <div className="text-2xl font-bold text-white mb-1">{formattedPrice}</div>
-                  <div className="text-[10px] text-slate-500 font-semibold mb-4">{t.taxIncluded}</div>
+                  <div className="text-[10px] text-slate-500 font-semibold mb-4">{t('common.taxIncluded')}</div>
 
                   <button
                     onClick={() => handlePurchase('pack', pack.credits + pack.bonus, pack.cadPrice)}
                     disabled={purchasing}
                     className="w-full py-2.5 px-3 bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-bold text-xs rounded-xl transition-all"
                   >
-                    {t.buyPack}
+                    {t('common.buyPack')}
                   </button>
                 </div>
               );
@@ -304,7 +300,7 @@ export default function PricingPage() {
             <div className="p-3 bg-[#F7941D]/10 text-[#F7941D] rounded-full mb-3">
               <RotateCcw className="w-6 h-6" />
             </div>
-            <h4 className="text-xs font-bold text-white mb-1">{t.badgeGuarantee}</h4>
+            <h4 className="text-xs font-bold text-white mb-1">{t('pricing.badgeGuarantee')}</h4>
             <p className="text-[11px] text-slate-400">Garantie remboursement sous 7 jours sans justification</p>
           </div>
 
@@ -312,7 +308,7 @@ export default function PricingPage() {
             <div className="p-3 bg-green-500/10 text-green-400 rounded-full mb-3">
               <Lock className="w-6 h-6" />
             </div>
-            <h4 className="text-xs font-bold text-white mb-1">{t.badgePayment}</h4>
+            <h4 className="text-xs font-bold text-white mb-1">{t('pricing.badgePayment')}</h4>
             <p className="text-[11px] text-slate-400">Transactions sécurisées par cryptage SSL 256 bits</p>
           </div>
 
@@ -320,7 +316,7 @@ export default function PricingPage() {
             <div className="p-3 bg-blue-500/10 text-blue-400 rounded-full mb-3">
               <ShieldCheck className="w-6 h-6" />
             </div>
-            <h4 className="text-xs font-bold text-white mb-1">{t.badgeCancel}</h4>
+            <h4 className="text-xs font-bold text-white mb-1">{t('pricing.badgeCancel')}</h4>
             <p className="text-[11px] text-slate-400">Modifiez ou stoppez votre abonnement en 1 clic</p>
           </div>
         </section>
@@ -328,7 +324,7 @@ export default function PricingPage() {
         {/* FAQ Accordion Section */}
         <section className="max-w-3xl mx-auto">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-extrabold text-white mb-2">{t.faqTitle}</h2>
+            <h2 className="text-2xl font-extrabold text-white mb-2">Foire aux questions</h2>
           </div>
 
           <div className="space-y-3">
@@ -358,11 +354,11 @@ export default function PricingPage() {
       {/* Footer */}
       <footer className="max-w-7xl mx-auto text-center py-8 border-t border-[#2E2E2E] text-xs text-slate-600 space-y-3">
         <div className="flex justify-center gap-6 text-slate-400">
-          <Link href="/legal/cgu" className="hover:text-white">{t.legal.cgu}</Link>
-          <Link href="/legal/confidentialite" className="hover:text-white">{t.legal.confidentialite}</Link>
-          <Link href="/legal/mentions-legales" className="hover:text-white">{t.legal.mentionsLegales}</Link>
+          <Link href="/legal/cgu" className="hover:text-white">{t('footer.cguLink')}</Link>
+          <Link href="/legal/confidentialite" className="hover:text-white">{t('footer.privacyLink')}</Link>
+          <Link href="/legal/mentions-legales" className="hover:text-white">{t('footer.mentionsLink')}</Link>
         </div>
-        <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. {t.footer.rights}</p>
+        <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. {t('footer.rights')}</p>
       </footer>
     </div>
   );

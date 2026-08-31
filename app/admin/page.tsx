@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Users, DollarSign, FolderCheck, ShieldAlert, Plus, Ban, CheckCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface UserData {
   _id: string;
@@ -31,6 +32,7 @@ interface ProjectData {
 }
 
 export default function AdminPage() {
+  const { t } = useTranslation();
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
 

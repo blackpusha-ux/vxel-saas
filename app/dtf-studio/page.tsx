@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface FabricSwatch {
   name: string;
@@ -53,6 +54,7 @@ function median(arr: number[]) {
 }
 
 export default function DTFStudioPage() {
+  const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
 

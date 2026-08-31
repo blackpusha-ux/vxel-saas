@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface QueueItem {
   src: string;
@@ -13,6 +14,7 @@ interface QueueItem {
 }
 
 export default function DTFPlanchePage() {
+  const { t } = useTranslation();
   const [printQueue, setPrintQueue] = useState<QueueItem[]>([]);
   const [tagWidth, setTagWidth] = useState<number>(29);
   const [tagHeight, setTagHeight] = useState<number>(34);
