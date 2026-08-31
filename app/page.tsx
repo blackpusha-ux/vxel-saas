@@ -5,123 +5,25 @@ import Link from 'next/link';
 import { useUser, UserButton } from '@clerk/nextjs';
 import {
   Menu, X, Image as ImageIcon, Scissors, Printer, Zap, Check, ArrowRight,
-  Mail, MapPin, Layers, Sparkles, RefreshCw, LayoutDashboard, Shield
+  Mail, MapPin, Layers, Sparkles, RefreshCw, LayoutDashboard, Shield,
+  Upload, Wand2, Download, Building2, Shirt, Palette, Lock, Headphones, Cpu
 } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/lib/LanguageContext';
-import { useCurrency } from '@/lib/CurrencyContext';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPriceInCurrency, formatPrice } from '@/lib/pricing';
 
 export default function Home() {
   const { t } = useTranslation();
-  const { currency } = useCurrency();
   const { userCredits, refreshCredits } = useAppContext();
   const { isLoaded, isSignedIn, user } = useUser();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAnnual, setIsAnnual] = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const primaryEmail = user?.emailAddresses?.[0]?.emailAddress || '';
   const isAdmin = primaryEmail === 'contact.tbalbiza@gmail.com' || primaryEmail === 'contact@vexel.com';
 
-  const discountFactor = isAnnual ? 0.8 : 1.0;
-
-  // Handle direct credit purchase / plan upgrade
-  const handlePurchase = async (planKey: string, creditsAmount: number, basePriceCAD: number) => {
-    if (!isSignedIn) {
-      window.location.href = '/sign-in';
-      return;
-    }
-
-    try {
-      setPurchasing(true);
-      const res = await fetch('/api/credits/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan: planKey,
-          credits: creditsAmount,
-          price: basePriceCAD,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setToastMessage(`✅ ${creditsAmount} crédits ajoutés à votre compte !`);
-        await refreshCredits();
-        setTimeout(() => setToastMessage(null), 4000);
-      } else {
-        alert(data.error || 'Erreur lors de l\'ajout des crédits');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Erreur de connexion');
-    } finally {
-      setPurchasing(false);
-    }
-  };
-
-  const plansList = [
-    {
-      key: 'free',
-      name: 'Gratuit',
-      cadPrice: 0,
-      credits: 5,
-      creditsLabel: '5 crédits / mois',
-      desc: 'Idéal pour tester nos outils DTF',
-      features: ['5 crédits offerts par mois', 'Accès Studio DTF', 'Accès Outil Planche', 'Support communautaire'],
-      badge: null,
-    },
-    {
-      key: 'starter',
-      name: 'Starter',
-      cadPrice: 29,
-      credits: 100,
-      creditsLabel: '100 crédits / mois',
-      desc: 'Pour les créateurs et indépendants',
-      features: ['100 crédits par mois', 'Détourage IA & Anti-halo', 'Export Haute Définition (300 DPI)', 'Support email 24h'],
-      badge: null,
-    },
-    {
-      key: 'pro',
-      name: 'Pro',
-      cadPrice: 59,
-      credits: 500,
-      creditsLabel: '500 crédits / mois',
-      desc: 'Pour les ateliers d\'impression et pros',
-      features: ['500 crédits par mois', 'Accès prioritaire Outil Planche', 'Nesting automatique multi-images', 'Support prioritaire 7j/7'],
-      badge: 'POPULAIRE',
-    },
-    {
-      key: 'enterprise',
-      name: 'Enterprise',
-      cadPrice: 149,
-      credits: 2000,
-      creditsLabel: 'Crédits illimités',
-      desc: 'Pour les gros volumes et réseaux',
-      features: ['Crédits illimités (2000+)', 'Manager de compte dédié', 'Accès API sur-mesure', 'Garantie SLA 99.9%'],
-      badge: null,
-    },
-  ];
-
-  const creditPacksList = [
-    { key: 'pack_50', credits: 50, bonus: 0, cadPrice: 15, badge: null },
-    { key: 'pack_200', credits: 200, bonus: 20, cadPrice: 39, badge: 'POPULAIRE' },
-    { key: 'pack_500', credits: 500, bonus: 100, cadPrice: 99, badge: null },
-    { key: 'pack_1000', credits: 1000, bonus: 300, cadPrice: 179, badge: null },
-  ];
-
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-slate-200 font-sans selection:bg-[#F7941D] selection:text-black">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-20 right-4 z-50 bg-[#F7941D] text-black font-extrabold px-6 py-3 rounded-2xl shadow-2xl animate-bounce flex items-center gap-2">
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Header / Navigation */}
       <header className="fixed w-full z-40 bg-[#0A0A0A]/90 backdrop-blur-md border-b border-[#2E2E2E] py-3">
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
@@ -144,7 +46,7 @@ export default function Home() {
                 <div className="h-4 w-px bg-[#2E2E2E]" />
                 <div className="flex items-center gap-1.5 bg-[#0A0A0A] border border-[#F7941D] px-2.5 py-1 rounded-full text-xs font-extrabold text-[#F7941D]">
                   <Zap className="w-3.5 h-3.5 fill-[#F7941D]" />
-                  <span>{userCredits !== null ? userCredits : '...'} crédits</span>
+                  <span>{userCredits !== null ? userCredits : '...'} {t.credits}</span>
                 </div>
                 <button
                   onClick={() => refreshCredits()}
@@ -165,10 +67,10 @@ export default function Home() {
             ) : (
               <div className="flex items-center gap-3">
                 <Link href="/sign-in" className="text-xs font-bold text-slate-300 hover:text-white px-3 py-2">
-                  Se connecter
+                  {t.signIn}
                 </Link>
                 <Link href="/sign-up" className="px-4 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-full text-xs shadow-lg shadow-[#F7941D]/20 transition-all">
-                  Créer un compte
+                  {t.signUp}
                 </Link>
               </div>
             )}
@@ -191,20 +93,20 @@ export default function Home() {
                     <span className="text-xs font-bold text-white">{user.firstName}</span>
                   </div>
                   <span className="text-xs font-bold text-[#F7941D] bg-[#F7941D]/10 border border-[#F7941D] px-2 py-1 rounded-full">
-                    ⚡ {userCredits} crédits
+                    ⚡ {userCredits} {t.credits}
                   </span>
                 </div>
                 <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="block w-full text-center py-2 bg-[#2E2E2E] text-white rounded-xl text-xs font-bold">
-                  Mon Dashboard
+                  {t.dashboard}
                 </Link>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <Link href="/sign-in" onClick={() => setIsMenuOpen(false)} className="py-2.5 text-center bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded-xl text-xs font-bold">
-                  Se connecter
+                  {t.signIn}
                 </Link>
                 <Link href="/sign-up" onClick={() => setIsMenuOpen(false)} className="py-2.5 text-center bg-[#F7941D] text-black rounded-xl text-xs font-extrabold">
-                  Créer un compte
+                  {t.signUp}
                 </Link>
               </div>
             )}
@@ -213,22 +115,22 @@ export default function Home() {
       </header>
 
       {/* Main Hero & Quick Tools Access */}
-      <main className="pt-28 pb-16 px-4 max-w-7xl mx-auto space-y-16">
-        {/* Section Accès Rapide aux 2 Outils */}
+      <main className="pt-28 pb-16 px-4 max-w-7xl mx-auto space-y-20">
+        {/* Hero Section */}
         <section className="text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F7941D]/10 border border-[#F7941D]/30 text-[#F7941D] text-xs font-extrabold uppercase tracking-wider">
-            <Zap className="w-4 h-4" /> Plateforme VXEL Studio Pro DTF
+            <Zap className="w-4 h-4" /> Plateforme SaaS B2B VXEL DTF Studio Pro
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight">
-            Préparez vos impressions DTF en <br />
+          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight leading-tight">
+            Préparation & Optimisation d'Impressions DTF <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F7941D] to-[#FFB25A]">
-              quelques secondes
+              en quelques secondes
             </span>
           </h1>
 
           <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto">
-            Accédez directement à nos 2 outils professionnels de traitement d'images et de génération de planches d'impression.
+            {t.quickAccessDesc}
           </p>
 
           {/* 2 Big Quick Access Cards */}
@@ -239,7 +141,7 @@ export default function Home() {
                 <div className="w-14 h-14 bg-[#F7941D]/10 text-[#F7941D] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <ImageIcon className="w-8 h-8" />
                 </div>
-                <h2 className="text-2xl font-extrabold text-white mb-2">Studio DTF</h2>
+                <h2 className="text-2xl font-extrabold text-white mb-2">{t.studio}</h2>
                 <p className="text-xs text-slate-400 leading-relaxed mb-6">
                   Détourage intelligent par IA, suppression des halos, retouche rapide de couleurs et mise à l'échelle HD (300 DPI).
                 </p>
@@ -249,7 +151,7 @@ export default function Home() {
                 href="/dtf-studio"
                 className="w-full py-3.5 px-6 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl shadow-lg shadow-[#F7941D]/20 transition-all flex items-center justify-center gap-2 text-sm"
               >
-                <span>Ouvrir Studio DTF</span>
+                <span>{t.tryStudio}</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -260,7 +162,7 @@ export default function Home() {
                 <div className="w-14 h-14 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Layers className="w-8 h-8" />
                 </div>
-                <h2 className="text-2xl font-extrabold text-white mb-2">Outil Planche DTF</h2>
+                <h2 className="text-2xl font-extrabold text-white mb-2">{t.planche}</h2>
                 <p className="text-xs text-slate-400 leading-relaxed mb-6">
                   Nesting automatique multi-visuels, optimisation des espaces de film, prévisualisation temps réel et export PDF prêt à imprimer.
                 </p>
@@ -270,151 +172,176 @@ export default function Home() {
                 href="/dtf-planche"
                 className="w-full py-3.5 px-6 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
               >
-                <span>Ouvrir Outil Planche</span>
+                <span>{t.tryPlanche}</span>
                 <ArrowRight className="w-4 h-4 text-[#F7941D]" />
               </Link>
             </div>
           </div>
         </section>
 
-        {/* Section Tarification & Forfaits */}
-        <section id="pricing" className="pt-12 border-t border-[#2E2E2E]">
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <h2 className="text-3xl font-extrabold text-white mb-3">Abonnements & Crédits</h2>
-            <p className="text-xs text-slate-400">
-              Choisissez un forfait mensuel/annuel ou rechargez votre solde avec des packs de crédits instantanés.
-            </p>
-
-            {/* Toggle Monthly / Annual */}
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <span className={`text-xs font-bold ${!isAnnual ? 'text-white' : 'text-slate-400'}`}>Mensuel</span>
-              <button
-                onClick={() => setIsAnnual(!isAnnual)}
-                className="relative w-12 h-6 bg-[#161616] border border-[#2E2E2E] rounded-full p-0.5 transition-colors"
-              >
-                <div className={`w-5 h-5 bg-[#F7941D] rounded-full transition-transform ${isAnnual ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
-              <span className={`text-xs font-bold flex items-center gap-1 ${isAnnual ? 'text-white' : 'text-slate-400'}`}>
-                Annuel
-                <span className="bg-[#F7941D]/20 border border-[#F7941D] text-[#F7941D] text-[9px] px-1.5 py-0.5 rounded-full font-extrabold">
-                  -20%
-                </span>
-              </span>
-            </div>
+        {/* Section 1 : Comment ça marche ? (3 Étapes visuelles) */}
+        <section className="pt-12 border-t border-[#2E2E2E]">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <h2 className="text-3xl font-extrabold text-white mb-3">{t.howItWorksTitle}</h2>
+            <p className="text-xs text-slate-400">{t.howItWorksSub}</p>
           </div>
 
-          {/* Grid Forfaits */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-            {plansList.map((plan) => {
-              const rawPrice = getPriceInCurrency(plan.cadPrice * discountFactor, currency);
-              const formatted = plan.cadPrice === 0 ? 'Gratuit' : formatPrice(rawPrice, currency);
-
-              return (
-                <div
-                  key={plan.key}
-                  className={`relative bg-[#161616] border rounded-2xl p-6 flex flex-col justify-between transition-all ${
-                    plan.badge ? 'border-[#F7941D] shadow-xl shadow-[#F7941D]/10' : 'border-[#2E2E2E]'
-                  }`}
-                >
-                  {plan.badge && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F7941D] text-black text-[10px] font-extrabold px-3 py-0.5 rounded-full uppercase">
-                      {plan.badge}
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">{plan.name}</h3>
-                    <p className="text-[11px] text-slate-400 mb-4 h-8">{plan.desc}</p>
-
-                    <div className="mb-4">
-                      <span className="text-2xl font-extrabold text-white font-mono">{formatted}</span>
-                      {plan.cadPrice > 0 && <span className="text-xs text-slate-400"> / mois</span>}
-                      <div className="text-xs font-extrabold text-[#F7941D] mt-1">{plan.creditsLabel}</div>
-                    </div>
-
-                    <div className="space-y-2 border-t border-[#2E2E2E] pt-4 mb-6">
-                      {plan.features.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs text-slate-300">
-                          <Check className="w-3.5 h-3.5 text-[#F7941D] flex-shrink-0" />
-                          <span>{f}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handlePurchase(plan.key, plan.credits, plan.cadPrice)}
-                    disabled={purchasing}
-                    className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 ${
-                      plan.badge
-                        ? 'bg-[#F7941D] text-black hover:bg-[#FFB25A]'
-                        : 'bg-[#0A0A0A] border border-[#2E2E2E] text-white hover:border-[#F7941D]'
-                    }`}
-                  >
-                    <span>Choisir {plan.name}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Section Packs de Crédits */}
-          <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8">
-            <div className="text-center max-w-xl mx-auto mb-8">
-              <h3 className="text-xl font-extrabold text-white mb-1">Packs de Crédits Ponctuels</h3>
-              <p className="text-xs text-slate-400">Achetez des crédits à l'unité. Vos crédits n'expirent jamais.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 relative">
+              <div className="w-12 h-12 bg-[#F7941D]/10 text-[#F7941D] rounded-2xl flex items-center justify-center mb-6">
+                <Upload className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.step1Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.step1Desc}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {creditPacksList.map((pack) => {
-                const rawPrice = getPriceInCurrency(pack.cadPrice, currency);
-                const formatted = formatPrice(rawPrice, currency);
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 relative">
+              <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center mb-6">
+                <Wand2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.step2Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.step2Desc}</p>
+            </div>
 
-                return (
-                  <div
-                    key={pack.key}
-                    className={`relative bg-[#0A0A0A] border rounded-2xl p-6 text-center transition-all ${
-                      pack.badge ? 'border-[#F7941D]' : 'border-[#2E2E2E]'
-                    }`}
-                  >
-                    {pack.badge && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#F7941D] text-black text-[9px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                        {pack.badge}
-                      </div>
-                    )}
-
-                    <div className="text-3xl font-extrabold text-white font-mono mb-1">{pack.credits}</div>
-                    <div className="text-xs font-bold text-slate-400 mb-2">Crédits d'impression</div>
-
-                    {pack.bonus > 0 ? (
-                      <div className="inline-block bg-[#F7941D]/10 text-[#F7941D] text-[10px] font-bold px-2 py-0.5 rounded-full mb-3">
-                        +{pack.bonus} crédits bonus
-                      </div>
-                    ) : (
-                      <div className="h-6 mb-3"></div>
-                    )}
-
-                    <div className="text-xl font-bold text-white mb-4">{formatted}</div>
-
-                    <button
-                      onClick={() => handlePurchase('pack', pack.credits + pack.bonus, pack.cadPrice)}
-                      disabled={purchasing}
-                      className="w-full py-2.5 px-3 bg-[#161616] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-bold text-xs rounded-xl transition-all"
-                    >
-                      Acheter ce pack
-                    </button>
-                  </div>
-                );
-              })}
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 relative">
+              <div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-2xl flex items-center justify-center mb-6">
+                <Download className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.step3Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.step3Desc}</p>
             </div>
           </div>
         </section>
+
+        {/* Section 2 : Pour qui ? */}
+        <section className="pt-12 border-t border-[#2E2E2E]">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <h2 className="text-3xl font-extrabold text-white mb-3">{t.forWhoTitle}</h2>
+            <p className="text-xs text-slate-400">{t.forWhoSub}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8">
+              <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-2xl flex items-center justify-center mb-6">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.audience1Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.audience1Desc}</p>
+            </div>
+
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8">
+              <div className="w-12 h-12 bg-[#F7941D]/10 text-[#F7941D] rounded-2xl flex items-center justify-center mb-6">
+                <Shirt className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.audience2Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.audience2Desc}</p>
+            </div>
+
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8">
+              <div className="w-12 h-12 bg-teal-500/10 text-teal-400 rounded-2xl flex items-center justify-center mb-6">
+                <Palette className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">{t.audience3Title}</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.audience3Desc}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 3 : Réassurance & Confiance */}
+        <section className="pt-12 border-t border-[#2E2E2E]">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <h2 className="text-3xl font-extrabold text-white mb-3">{t.reassuranceTitle}</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 flex items-start gap-4">
+              <div className="p-3 bg-green-500/10 text-green-400 rounded-xl">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">{t.reassurance1Title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{t.reassurance1Desc}</p>
+              </div>
+            </div>
+
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 flex items-start gap-4">
+              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
+                <Headphones className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">{t.reassurance2Title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{t.reassurance2Desc}</p>
+              </div>
+            </div>
+
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-8 flex items-start gap-4">
+              <div className="p-3 bg-[#F7941D]/10 text-[#F7941D] rounded-xl">
+                <Cpu className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">{t.reassurance3Title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{t.reassurance3Desc}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section Final CTA : Voir les Tarifs */}
+        <section className="bg-gradient-to-r from-[#161616] via-[#1F1F1F] to-[#161616] border border-[#F7941D]/40 rounded-3xl p-10 text-center space-y-6 shadow-2xl">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white">
+            Prêt à optimiser vos impressions DTF ?
+          </h2>
+          <p className="text-slate-400 text-xs md:text-sm max-w-xl mx-auto">
+            Découvrez nos tarifs clairs et nos packs de crédits rechargeables sans engagement.
+          </p>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-sm rounded-xl shadow-xl shadow-[#F7941D]/20 transition-all hover:scale-105"
+          >
+            <span>{t.viewPricing}</span>
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-[#0A0A0A] border-t border-[#2E2E2E] py-8 text-center text-xs text-slate-600">
-        © {new Date().getFullYear()} VXEL DTF Studio Pro. Tous droits réservés.
+      {/* Footer avec liens légaux */}
+      <footer className="bg-[#0A0A0A] border-t border-[#2E2E2E] py-12 text-slate-400">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="col-span-1 md:col-span-2 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-[#F7941D] rounded-md flex items-center justify-center text-black font-bold">V</div>
+              <span className="text-xl font-bold text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
+            </div>
+            <p className="text-xs max-w-xs leading-relaxed">{t.footer.desc}</p>
+          </div>
+
+          <div>
+            <h4 className="text-white font-bold text-xs mb-3">{t.footer.tools}</h4>
+            <ul className="space-y-2 text-xs">
+              <li><Link href="/dtf-studio" className="hover:text-[#F7941D]">{t.studio}</Link></li>
+              <li><Link href="/dtf-planche" className="hover:text-[#F7941D]">{t.planche}</Link></li>
+              <li><Link href="/pricing" className="hover:text-[#F7941D]">{t.viewPricing}</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-white font-bold text-xs mb-3">Informations Légales</h4>
+            <ul className="space-y-2 text-xs">
+              <li><Link href="/legal/cgu" className="hover:text-[#F7941D]">{t.legal.cgu}</Link></li>
+              <li><Link href="/legal/confidentialite" className="hover:text-[#F7941D]">{t.legal.confidentialite}</Link></li>
+              <li><Link href="/legal/mentions-legales" className="hover:text-[#F7941D]">{t.legal.mentionsLegales}</Link></li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 border-t border-[#2E2E2E] pt-6 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
+          <p>© {new Date().getFullYear()} VXEL DTF Studio Pro. {t.footer.rights}</p>
+          <div className="flex gap-4 mt-2 md:mt-0">
+            <Link href="/legal/cgu" className="hover:text-slate-300">CGU</Link>
+            <Link href="/legal/confidentialite" className="hover:text-slate-300">Confidentialité</Link>
+            <Link href="/legal/mentions-legales" className="hover:text-slate-300">Mentions Légales</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );
