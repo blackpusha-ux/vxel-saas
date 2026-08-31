@@ -24,7 +24,6 @@ import {
   Zap,
   ArrowLeft,
   FileSpreadsheet,
-  ZapOff,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'contact.tbalbiza@gmail.com';
@@ -84,8 +83,8 @@ export default function AdminPage() {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // Inspect email connected via Clerk
-  const userEmail = user?.emailAddresses.find((e) => e.id === user?.primaryEmailAddressId)?.emailAddress || user?.emailAddresses[0]?.emailAddress || '';
+  // Safe inspection of connected email via Clerk
+  const userEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '') : '';
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -93,7 +92,7 @@ export default function AdminPage() {
     }
   }, [isLoaded, user, userEmail]);
 
-  const isAdmin = isLoaded && isSignedIn && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = isLoaded && isSignedIn && !!userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   // Fetch Users
   const fetchUsers = useCallback(async () => {

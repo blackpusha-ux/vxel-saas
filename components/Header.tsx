@@ -15,16 +15,16 @@ interface HeaderProps {
 
 export default function Header({ onOpenContact }: HeaderProps) {
   const { t } = useTranslation();
-  const { user, isSignedIn } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const [credits, setCredits] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Inspect email for conditional admin link
-  const userEmail = user?.emailAddresses.find((e) => e.id === user?.primaryEmailAddressId)?.emailAddress || user?.emailAddresses[0]?.emailAddress || '';
-  const isAdmin = isSignedIn && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // Inspect email safely with Clerk optional chaining and isLoaded check
+  const userEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '') : '';
+  const isAdmin = isLoaded && isSignedIn && !!userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   useEffect(() => {
-    if (isSignedIn && user) {
+    if (isLoaded && isSignedIn && user) {
       fetch('/api/user/credits')
         .then((res) => res.json())
         .then((data) => {
@@ -34,7 +34,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
         })
         .catch(() => {});
     }
-  }, [isSignedIn, user]);
+  }, [isLoaded, isSignedIn, user]);
 
   return (
     <header className="sticky top-0 z-40 bg-[#0A0A0A]/90 backdrop-blur-md border-b border-[#2E2E2E]">
@@ -75,8 +75,8 @@ export default function Header({ onOpenContact }: HeaderProps) {
             </button>
           )}
 
-          {/* Conditional Admin Link (Only for contact.tbalbiza@gmail.com) */}
-          {isAdmin && (
+          {/* Conditional Admin Link (Safely checked with isLoaded && isAdmin) */}
+          {isLoaded && isAdmin && (
             <Link
               href="/admin"
               className="px-3 py-1 bg-[#F7941D]/10 border border-[#F7941D]/40 text-[#F7941D] hover:bg-[#F7941D] hover:text-black rounded-xl font-extrabold transition-all flex items-center gap-1.5 shadow-sm"
@@ -91,7 +91,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
         <div className="flex items-center gap-3">
           <LanguageCurrencySelector />
 
-          {isSignedIn ? (
+          {isLoaded && isSignedIn ? (
             <div className="flex items-center gap-3">
               {credits !== null && (
                 <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-[#161616] border border-[#2E2E2E] rounded-full text-xs font-bold text-slate-200">
@@ -101,7 +101,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
               )}
               <UserButton />
             </div>
-          ) : (
+          ) : isLoaded ? (
             <div className="flex items-center gap-2">
               <SignInButton mode="modal">
                 <button className="px-3.5 py-1.5 bg-[#161616] hover:bg-[#222] border border-[#2E2E2E] text-white rounded-xl text-xs font-bold transition-all">
@@ -114,7 +114,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
                 </button>
               </SignUpButton>
             </div>
-          )}
+          ) : null}
 
           {/* Mobile Menu Toggle */}
           <button
@@ -145,7 +145,7 @@ export default function Header({ onOpenContact }: HeaderProps) {
             {t('common.viewPricing')}
           </Link>
 
-          {isAdmin && (
+          {isLoaded && isAdmin && (
             <Link
               href="/admin"
               onClick={() => setMobileMenuOpen(false)}
