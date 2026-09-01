@@ -89,6 +89,13 @@ export default function DTFStudioPage() {
   const [bgTolerance, setBgTolerance] = useState(30);
   const [whiteTolerance, setWhiteTolerance] = useState(35); // Slider Tolérance Blanc pour off-whites & contours
 
+  // === NOUVEAU : Seuil de luminosité global pour la suppression du blanc ===
+  const [whiteThreshold, setWhiteThreshold] = useState(240); // (R+G+B)/3 > seuil → transparent
+  const [aggressiveWhite, setAggressiveWhite] = useState(false); // Seuil forcé à 220
+
+  // === UPSCALE : Facteur d'agrandissement AVANT traitement ===
+  // (remplace scaleFactor - même variable, UI réactivée ci-dessous)
+
   const [erodePixels, setErodePixels] = useState(0);
   const [lumaMode, setLumaMode] = useState<'off' | 'soft' | 'dark' | 'light' | 'auto'>('off');
   const [lumaT, setLumaT] = useState(40);
@@ -229,8 +236,37 @@ export default function DTFStudioPage() {
       }
 
       let removedCount = 0;
-      if (bgRemovalMode !== 'none') {
-        removedCount = safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, bgRemovalMode, whiteTolerance);
+
+      // =====================================================================
+      // STRATÉGIE DOUBLE :
+      //  • Modes "black" / "auto" / "custom" → flood-fill depuis les bords
+      //  • Mode "white" → SEUIL DE LUMINOSITÉ GLOBAL pixel-par-pixel (R+G+B)/3
+      //  • Mode "both"  → flood-fill noir + seuil luminosité blanc
+      // =====================================================================
+      const effectiveWhiteThreshold = aggressiveWhite ? 220 : whiteThreshold;
+
+      // Étape 1 : Flood-fill pour suppression du NOIR / AUTO / CUSTOM
+      const modeForFloodFill: string =
+        bgRemovalMode === 'white' ? 'none' :
+        bgRemovalMode === 'both'  ? 'black' :
+        bgRemovalMode;
+
+      if (modeForFloodFill !== 'none') {
+        removedCount += safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, modeForFloodFill, whiteTolerance);
+      }
+
+      // Étape 2 : Seuil de luminosité GLOBAL pour suppression du BLANC
+      // Formule simple : (R+G+B)/3 > seuil → alpha = 0
+      // Aucun flood-fill, TOUS les pixels clairs deviennent transparents (fond + design)
+      if (bgRemovalMode === 'white' || bgRemovalMode === 'both') {
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue; // déjà transparent
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          if (avg >= effectiveWhiteThreshold) {
+            data[i + 3] = 0;
+            removedCount++;
+          }
+        }
       }
 
       const erodeRadius = erodePixels * scale;
@@ -328,6 +364,8 @@ export default function DTFStudioPage() {
     clickedBgColor,
     bgTolerance,
     whiteTolerance,
+    whiteThreshold,
+    aggressiveWhite,
     erodePixels,
     enableFillHoles,
     fillHolesSize,
@@ -752,7 +790,33 @@ export default function DTFStudioPage() {
 
         {/* Colonne 2 : Contrôles */}
         <div className="col-span-12 lg:col-span-4 overflow-y-auto max-h-[calc(100vh-120px)] pr-1 flex flex-col gap-2">
-          {/* Suppression du fond */}
+
+          {/* ====== UPSCALE AVANT TRAITEMENT ====== */}
+          <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
+            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
+              {t('studioPage.upscaleSection')}
+            </h3>
+            <div className="flex items-center gap-1.5">
+              {([1, 2, 4] as const).map((factor) => (
+                <button
+                  key={factor}
+                  onClick={() => setScaleFactor(factor)}
+                  className={`flex-1 py-1.5 rounded text-xs font-extrabold border transition-all ${
+                    scaleFactor === factor
+                      ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-md shadow-[#F7941D]/20'
+                      : 'bg-[#0A0A0A] text-slate-300 border-[#2E2E2E] hover:border-[#F7941D]'
+                  }`}
+                >
+                  {factor === 1 ? t('studioPage.upscale1x') : factor === 2 ? t('studioPage.upscale2x') : t('studioPage.upscale4x')}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1.5">
+              Résolution sortie : {scaleFactor === 1 ? 'Originale' : scaleFactor === 2 ? '2× (recommandé)' : '4× Ultra-HD (lent)'}
+            </p>
+          </div>
+
+          {/* ====== SUPPRESSION DU FOND ====== */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
             <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
               {t('studioPage.removeBgSection')}
@@ -762,7 +826,7 @@ export default function DTFStudioPage() {
               <select
                 value={bgRemovalMode}
                 onChange={(e) => {
-                  const m = e.target.value as any;
+                  const m = e.target.value as 'auto' | 'black' | 'white' | 'both' | 'custom' | 'picker' | 'click' | 'none';
                   setBgRemovalMode(m);
                   if (m === 'click' || m === 'custom') setAwaitingClickColor(true);
                   else setAwaitingClickColor(false);
@@ -774,6 +838,7 @@ export default function DTFStudioPage() {
                 <option value="white">{t('studio.bgRemoval.mode.white')}</option>
                 <option value="both">{t('studio.bgRemoval.mode.both')}</option>
                 <option value="custom">{t('studio.bgRemoval.mode.custom')}</option>
+                <option value="none">{t('studio.bgRemoval.mode.none')}</option>
               </select>
             </div>
             {bgRemovalMode === 'picker' && (
@@ -787,37 +852,71 @@ export default function DTFStudioPage() {
                 />
               </div>
             )}
-            <div className="flex items-center gap-2 mb-2 text-xs">
-              <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.toleranceLabel')}</label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={bgTolerance}
-                onChange={(e) => setBgTolerance(parseInt(e.target.value))}
-                className="flex-1 accent-[#F7941D]"
-              />
-              <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{bgTolerance}</span>
-            </div>
 
-            {/* Slider spécifique Tolérance Blanc (Off-whites & anti-aliasing) */}
-            {(bgRemovalMode === 'auto' || bgRemovalMode === 'white' || bgRemovalMode === 'both') && (
-              <div className="flex items-center gap-2 text-xs">
-                <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.whiteToleranceLabel')}</label>
+            {/* Tolérance globale (flood-fill noir/auto/custom) */}
+            {bgRemovalMode !== 'white' && (
+              <div className="flex items-center gap-2 mb-2 text-xs">
+                <label className="w-20 text-[#9C9C9C] text-[11px]">{t('studioPage.toleranceLabel')}</label>
                 <input
                   type="range"
-                  min="5"
-                  max="80"
-                  value={whiteTolerance}
-                  onChange={(e) => setWhiteTolerance(parseInt(e.target.value))}
+                  min="0"
+                  max="100"
+                  value={bgTolerance}
+                  onChange={(e) => setBgTolerance(parseInt(e.target.value))}
                   className="flex-1 accent-[#F7941D]"
                 />
-                <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{whiteTolerance}%</span>
+                <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{bgTolerance}</span>
+              </div>
+            )}
+
+            {/* ====== CONTRÔLES SEUIL BLANC (mode white / both) ====== */}
+            {(bgRemovalMode === 'white' || bgRemovalMode === 'both') && (
+              <div className="space-y-2 pt-1 border-t border-[#2E2E2E] mt-1">
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-[10px] font-bold text-[#F7941D] uppercase tracking-wider">⚡ Seuil Luminosité</span>
+                  <span className="text-[9px] text-slate-500 ml-auto">Simple (R+G+B)/3</span>
+                </div>
+
+                {/* Checkbox Suppression Agressive */}
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    checked={aggressiveWhite}
+                    onChange={(e) => {
+                      setAggressiveWhite(e.target.checked);
+                      if (e.target.checked) setWhiteThreshold(220);
+                    }}
+                    className="accent-[#F7941D] w-3.5 h-3.5"
+                  />
+                  <span className="text-[11px] text-slate-300 font-bold">{t('studioPage.aggressiveWhiteLabel')}</span>
+                </label>
+
+                {/* Slider seuil luminosité 150-255 */}
+                <div className="flex items-center gap-2 text-xs">
+                  <label className="w-20 text-[#9C9C9C] text-[11px] shrink-0">{t('studioPage.whiteThresholdLabel')}</label>
+                  <input
+                    type="range"
+                    min="150"
+                    max="255"
+                    value={aggressiveWhite ? 220 : whiteThreshold}
+                    disabled={aggressiveWhite}
+                    onChange={(e) => setWhiteThreshold(parseInt(e.target.value))}
+                    className="flex-1 accent-[#F7941D] disabled:opacity-40"
+                  />
+                  <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">
+                    {aggressiveWhite ? 220 : whiteThreshold}
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-500 leading-snug">
+                  Pixels dont la moyenne (R+G+B)/3 ≥ {aggressiveWhite ? 220 : whiteThreshold} → transparents.
+                  Tous les blancs supprimés (fond + design).
+                </p>
               </div>
             )}
 
             {debugText && <div className="text-[10px] text-[#FFB25A] mt-1">📊 {debugText}</div>}
           </div>
+
 
           {/* Anti-halo & Luma Key */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">

@@ -164,6 +164,25 @@ export const dictionary: Record<Language, Record<string, any>> = {
       statusNesting: 'Optimisation du nesting...',
       advancedOptions: 'Options avancées',
       hideAdvancedOptions: 'Masquer les options avancées',
+      upscaleSection: '🔍 Upscale Avant Traitement',
+      upscaleLabel: 'Résolution Upscale',
+      upscale1x: '1x (Original)',
+      upscale2x: '2x HD',
+      upscale4x: '4x Ultra-HD',
+      whiteThresholdLabel: 'Seuil Luminosité Blanc',
+      aggressiveWhiteLabel: 'Suppression agressive (seuil 220)',
+    },
+    studio: {
+      bgRemoval: {
+        mode: {
+          auto: 'Auto (Détection intelligente)',
+          black: 'Fond Noir',
+          white: 'Fond Blanc (Seuil luminosité)',
+          both: 'Noir & Blanc',
+          custom: 'Couleur personnalisée',
+          none: 'Désactivé',
+        },
+      },
     },
     adminPage: {
       title: 'Back-Office Administrateur VXEL',
@@ -426,6 +445,25 @@ export const dictionary: Record<Language, Record<string, any>> = {
       statusNesting: 'Optimizing nesting layout...',
       advancedOptions: 'Advanced options',
       hideAdvancedOptions: 'Hide advanced options',
+      upscaleSection: '🔍 Upscale Before Processing',
+      upscaleLabel: 'Upscale Resolution',
+      upscale1x: '1x (Original)',
+      upscale2x: '2x HD',
+      upscale4x: '4x Ultra-HD',
+      whiteThresholdLabel: 'White Luminosity Threshold',
+      aggressiveWhiteLabel: 'Aggressive removal (threshold 220)',
+    },
+    studio: {
+      bgRemoval: {
+        mode: {
+          auto: 'Auto (Smart detection)',
+          black: 'Black Background',
+          white: 'White Background (Luminosity)',
+          both: 'Black & White',
+          custom: 'Custom Color',
+          none: 'Disabled',
+        },
+      },
     },
     adminPage: {
       title: 'VXEL Administrator Back-Office',
@@ -688,6 +726,25 @@ export const dictionary: Record<Language, Record<string, any>> = {
       statusNesting: 'Optimizando diseño de nesting...',
       advancedOptions: 'Opciones avanzadas',
       hideAdvancedOptions: 'Ocultar opciones avanzadas',
+      upscaleSection: '🔍 Upscale Antes del Procesado',
+      upscaleLabel: 'Resolución Upscale',
+      upscale1x: '1x (Original)',
+      upscale2x: '2x HD',
+      upscale4x: '4x Ultra-HD',
+      whiteThresholdLabel: 'Umbral Luminosidad Blanco',
+      aggressiveWhiteLabel: 'Eliminación agresiva (umbral 220)',
+    },
+    studio: {
+      bgRemoval: {
+        mode: {
+          auto: 'Auto (Detección inteligente)',
+          black: 'Fondo Negro',
+          white: 'Fondo Blanco (Luminosidad)',
+          both: 'Negro & Blanco',
+          custom: 'Color personalizado',
+          none: 'Desactivado',
+        },
+      },
     },
     adminPage: {
       title: 'Back-Office Administrador VXEL',
