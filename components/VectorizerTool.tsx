@@ -19,14 +19,17 @@ export default function VectorizerTool() {
   const [vectorizedSvg, setVectorizedSvg] = useState<string | null>(null);
   const [stats, setStats] = useState<ImageToVectorStats | null>(null);
 
-  // Sliders State
-  const [numColors, setNumColors] = useState<number>(16);
-  const [noiseFilter, setNoiseFilter] = useState<number>(4);
-  const [pathPrecision, setPathPrecision] = useState<number>(4);
+  // Sliders State — valeurs optimisées pour les visuels complexes type DTF
+  const [numColors, setNumColors] = useState<number>(20);       // plus de couleurs par défaut
+  const [noiseFilter, setNoiseFilter] = useState<number>(3);    // moins agressif
+  const [pathPrecision, setPathPrecision] = useState<number>(5); // plus de fidélité
+  const [smoothness, setSmoothness] = useState<number>(4);      // lissage courbes (1-8)
+  const [minShapeSize, setMinShapeSize] = useState<number>(3);  // taille mini formes px
 
   // Status UI
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const [progressLabel, setProgressLabel] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -40,6 +43,7 @@ export default function VectorizerTool() {
       workerRef.current.onmessage = async (e) => {
         setIsProcessing(false);
         setProgress(100);
+        setProgressLabel('');
 
         if (e.data.success) {
           setVectorizedSvg(e.data.svg);
@@ -47,15 +51,13 @@ export default function VectorizerTool() {
             colorCount: e.data.stats.colorCount,
             pathCount: e.data.stats.pathCount,
             durationMs: e.data.stats.durationMs,
-            engine: 'Vectorisation IA HD',
+            engine: 'VTracer Pro v3',
           });
 
           // Save project record in MongoDB avec les fichiers en base64
           try {
-            // Encode le SVG en base64 (UTF-8 → base64)
             const svgBase64 = btoa(unescape(encodeURIComponent(e.data.svg)));
 
-            // Encode l'image originale en base64 via le canvas
             let originalBase64 = '';
             if (originalFile) {
               await new Promise<void>((resolve) => {
@@ -108,7 +110,14 @@ export default function VectorizerTool() {
     };
   }, [originalFile]);
 
-  const runVectorization = useCallback((file: File, colorsCountVal?: number, noiseVal?: number, precVal?: number) => {
+  const runVectorization = useCallback((
+    file: File,
+    colorsCountVal?: number,
+    noiseVal?: number,
+    precVal?: number,
+    smoothVal?: number,
+    minSizeVal?: number,
+  ) => {
     setErrorMessage(null);
 
     if (file.size > 50 * 1024 * 1024) {
@@ -122,16 +131,27 @@ export default function VectorizerTool() {
     }
 
     setIsProcessing(true);
-    setProgress(15);
+    setProgress(10);
+    setProgressLabel('Chargement image...');
 
     const objectUrl = URL.createObjectURL(file);
     setOriginalPreviewUrl(objectUrl);
 
     const img = new Image();
     img.onload = () => {
+      // Redimensionne si très grande (perf + qualité)
+      let targetW = img.width;
+      let targetH = img.height;
+      const MAX_DIM = 1200;
+      if (Math.max(targetW, targetH) > MAX_DIM) {
+        const ratio = MAX_DIM / Math.max(targetW, targetH);
+        targetW = Math.round(targetW * ratio);
+        targetH = Math.round(targetH * ratio);
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = targetW;
+      canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         setIsProcessing(false);
@@ -139,16 +159,20 @@ export default function VectorizerTool() {
         return;
       }
 
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      // Rendu haute qualité avec lissage
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
 
-      setProgress(40);
+      setProgress(30);
+      setProgressLabel('Analyse des couleurs...');
 
       if (workerRef.current) {
         workerRef.current.postMessage({
           imageData,
-          width: img.width,
-          height: img.height,
+          width: targetW,
+          height: targetH,
           options: {
             color_mode: 'color',
             hierarchical: 'stacked',
@@ -156,10 +180,14 @@ export default function VectorizerTool() {
             filter_speckle: noiseVal ?? noiseFilter,
             number_of_colors: colorsCountVal ?? numColors,
             path_precision: precVal ?? pathPrecision,
+            smoothness: smoothVal ?? smoothness,
+            min_shape_size: minSizeVal ?? minShapeSize,
             layer_difference: 16,
             color_precision: 6,
           },
         });
+        setProgress(60);
+        setProgressLabel('Vectorisation en cours...');
       } else {
         setIsProcessing(false);
         setErrorMessage('Module de conversion indisponible');
@@ -168,11 +196,12 @@ export default function VectorizerTool() {
 
     img.onerror = () => {
       setIsProcessing(false);
-      setErrorMessage('Impossible de lire l\'image');
+      setErrorMessage("Impossible de lire l'image");
     };
 
     img.src = objectUrl;
-  }, [noiseFilter, numColors, pathPrecision, t]);
+  }, [noiseFilter, numColors, pathPrecision, smoothness, minShapeSize, t]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -235,66 +264,96 @@ export default function VectorizerTool() {
         )}
       </div>
 
-      {/* Control Sliders Panel */}
-      <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Colors Count Slider */}
+      {/* Control Sliders Panel — 5 contrôles */}
+      <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-5">
+        {/* Couleurs */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-300">
             <span>{t('vectorizer.colors')}</span>
             <span className="text-[#F7941D] font-mono">{numColors}</span>
           </div>
           <input
-            type="range"
-            min="2"
-            max="32"
-            value={numColors}
+            type="range" min="4" max="32" value={numColors}
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setNumColors(val);
-              if (originalFile) runVectorization(originalFile, val, noiseFilter, pathPrecision);
+              if (originalFile) runVectorization(originalFile, val, noiseFilter, pathPrecision, smoothness, minShapeSize);
             }}
             className="w-full accent-[#F7941D]"
           />
+          <p className="text-[10px] text-slate-500">Palettes couleurs détectées</p>
         </div>
 
-        {/* Noise Filter Slider */}
+        {/* Filtre bruit */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-300">
             <span>{t('vectorizer.noiseFilter')}</span>
             <span className="text-[#F7941D] font-mono">{noiseFilter} px</span>
           </div>
           <input
-            type="range"
-            min="0"
-            max="10"
-            value={noiseFilter}
+            type="range" min="0" max="10" value={noiseFilter}
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setNoiseFilter(val);
-              if (originalFile) runVectorization(originalFile, numColors, val, pathPrecision);
+              if (originalFile) runVectorization(originalFile, numColors, val, pathPrecision, smoothness, minShapeSize);
             }}
             className="w-full accent-[#F7941D]"
           />
+          <p className="text-[10px] text-slate-500">Suppression artefacts JPEG</p>
         </div>
 
-        {/* Curve Precision Slider */}
+        {/* Précision */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-300">
             <span>{t('vectorizer.precision')}</span>
-            <span className="text-[#F7941D] font-mono">{pathPrecision} / 8</span>
+            <span className="text-[#F7941D] font-mono">{pathPrecision}/8</span>
           </div>
           <input
-            type="range"
-            min="1"
-            max="8"
-            value={pathPrecision}
+            type="range" min="1" max="8" value={pathPrecision}
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setPathPrecision(val);
-              if (originalFile) runVectorization(originalFile, numColors, noiseFilter, val);
+              if (originalFile) runVectorization(originalFile, numColors, noiseFilter, val, smoothness, minShapeSize);
             }}
             className="w-full accent-[#F7941D]"
           />
+          <p className="text-[10px] text-slate-500">Fidélité des courbes Bézier</p>
+        </div>
+
+        {/* Lissage */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs font-bold text-slate-300">
+            <span>✨ Lissage</span>
+            <span className="text-[#F7941D] font-mono">{smoothness}/8</span>
+          </div>
+          <input
+            type="range" min="1" max="8" value={smoothness}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              setSmoothness(val);
+              if (originalFile) runVectorization(originalFile, numColors, noiseFilter, pathPrecision, val, minShapeSize);
+            }}
+            className="w-full accent-[#F7941D]"
+          />
+          <p className="text-[10px] text-slate-500">Tension des courbes Catmull-Rom</p>
+        </div>
+
+        {/* Taille min. */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs font-bold text-slate-300">
+            <span>🔲 Min. forme</span>
+            <span className="text-[#F7941D] font-mono">{minShapeSize} px</span>
+          </div>
+          <input
+            type="range" min="1" max="10" value={minShapeSize}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              setMinShapeSize(val);
+              if (originalFile) runVectorization(originalFile, numColors, noiseFilter, pathPrecision, smoothness, val);
+            }}
+            className="w-full accent-[#F7941D]"
+          />
+          <p className="text-[10px] text-slate-500">Ignore les détails trop petits</p>
         </div>
       </div>
 
@@ -329,16 +388,20 @@ export default function VectorizerTool() {
 
       {/* Processing Status Banner */}
       {isProcessing && (
-        <div className="bg-[#161616] border border-[#F7941D]/50 p-6 rounded-2xl space-y-3 animate-pulse">
+        <div className="bg-[#161616] border border-[#F7941D]/50 p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-[#F7941D]">
             <span className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin" /> {t('vectorizer.processing')}
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              {progressLabel || t('vectorizer.processing')}
             </span>
             <span>{progress}%</span>
           </div>
-          <div className="w-full bg-[#0A0A0A] h-2.5 rounded-full overflow-hidden border border-[#2E2E2E]">
-            <div className="bg-[#F7941D] h-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          <div className="w-full bg-[#0A0A0A] h-2 rounded-full overflow-hidden border border-[#2E2E2E]">
+            <div className="bg-[#F7941D] h-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
           </div>
+          <p className="text-[10px] text-slate-500 font-mono">
+            Pipeline : débruitage → quantisation K-Means++ → marching squares → Douglas-Peucker → courbes Bézier
+          </p>
         </div>
       )}
 
