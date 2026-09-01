@@ -37,7 +37,7 @@ export default function VectorizerTool() {
     if (typeof window !== 'undefined') {
       workerRef.current = new Worker('/workers/vtracer-worker.js');
 
-      workerRef.current.onmessage = (e) => {
+      workerRef.current.onmessage = async (e) => {
         setIsProcessing(false);
         setProgress(100);
 
@@ -50,18 +50,51 @@ export default function VectorizerTool() {
             engine: 'Vectorisation IA HD',
           });
 
-          // Save project record in MongoDB
-          fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              toolType: 'vectorizer',
-              originalFileName: originalFile ? originalFile.name : 'visuel-source.png',
-              processedFileName: `VXEL_ImageToVector_${Date.now()}.svg`,
-              status: 'completed',
-              creditsUsed: 1,
-            }),
-          }).catch(() => {});
+          // Save project record in MongoDB avec les fichiers en base64
+          try {
+            // Encode le SVG en base64 (UTF-8 → base64)
+            const svgBase64 = btoa(unescape(encodeURIComponent(e.data.svg)));
+
+            // Encode l'image originale en base64 via le canvas
+            let originalBase64 = '';
+            if (originalFile) {
+              await new Promise<void>((resolve) => {
+                const tmpImg = new Image();
+                const objUrl = URL.createObjectURL(originalFile);
+                tmpImg.onload = () => {
+                  const c = document.createElement('canvas');
+                  c.width = tmpImg.width;
+                  c.height = tmpImg.height;
+                  const cx = c.getContext('2d');
+                  if (cx) { cx.drawImage(tmpImg, 0, 0); originalBase64 = c.toDataURL('image/png'); }
+                  URL.revokeObjectURL(objUrl);
+                  resolve();
+                };
+                tmpImg.onerror = () => { URL.revokeObjectURL(objUrl); resolve(); };
+                tmpImg.src = objUrl;
+              });
+            }
+
+            const svgFileName = `VXEL_ImageToVector_${Date.now()}.svg`;
+            fetch('/api/projects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                toolType: 'vectorizer',
+                originalFileName: originalFile ? originalFile.name : 'visuel-source.png',
+                processedFileName: svgFileName,
+                originalFileData: originalBase64,
+                processedFileData: svgBase64,
+                originalFileMime: 'image/png',
+                processedFileMime: 'image/svg+xml',
+                fileSize: originalFile ? originalFile.size : 0,
+                status: 'completed',
+                creditsUsed: 1,
+              }),
+            }).catch(() => {});
+          } catch {
+            // Non bloquant
+          }
         } else {
           setErrorMessage(e.data.error || 'Erreur lors de la conversion Image to Vector');
         }

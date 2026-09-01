@@ -76,6 +76,7 @@ export default function DTFStudioPage() {
   const [clickedBgColor, setClickedBgColor] = useState<{ r: number; g: number; b: number } | null>(null);
   const [awaitingClickColor, setAwaitingClickColor] = useState(false);
   const [processedCanvas, setProcessedCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string>('visuel.png'); // nom du fichier chargé
 
   // Settings
   const [bgView, setBgView] = useState<'fabric' | 'checker' | 'black' | 'white'>('fabric');
@@ -399,6 +400,7 @@ export default function DTFStudioPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setCurrentFileName(file.name); // mémorise le nom du fichier pour l'enregistrement projet
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
@@ -531,7 +533,79 @@ export default function DTFStudioPage() {
       console.error('Erreur consommation crédit:', e);
       showToast('Erreur serveur', 'error');
     }
+
+    // =========================================================================
+    // Enregistrement projet en base64 dans MongoDB (après téléchargement réussi)
+    // On utilise try/catch séparé pour ne pas bloquer l'UX si ça échoue
+    // =========================================================================
+    try {
+      if (processedCanvas && originalImage) {
+        const processedDataUrl = type === 'color'
+          ? processedCanvas.toDataURL('image/png')
+          : (() => {
+              // Génère le white-base en base64 pour le stockage
+              const w = processedCanvas.width;
+              const h = processedCanvas.height;
+              const wc2 = document.createElement('canvas');
+              wc2.width = w;
+              wc2.height = h;
+              const wctx = wc2.getContext('2d');
+              if (!wctx) return processedCanvas.toDataURL('image/png');
+              const srcImgData = processedCanvas.getContext('2d')!.getImageData(0, 0, w, h);
+              const whiteImg = new ImageData(new Uint8ClampedArray(w * h * 4), w, h);
+              for (let i = 0; i < srcImgData.data.length; i += 4) {
+                if (srcImgData.data[i + 3] > 20) {
+                  whiteImg.data[i] = 255; whiteImg.data[i+1] = 255;
+                  whiteImg.data[i+2] = 255; whiteImg.data[i+3] = 255;
+                }
+              }
+              wctx.putImageData(whiteImg, 0, 0);
+              return wc2.toDataURL('image/png');
+            })();
+
+        // Image originale en base64
+        const origCanvas = document.createElement('canvas');
+        origCanvas.width = originalImage.width;
+        origCanvas.height = originalImage.height;
+        const origCtx = origCanvas.getContext('2d');
+        if (origCtx) origCtx.drawImage(originalImage, 0, 0);
+        const originalDataUrl = origCanvas.toDataURL('image/png');
+
+        const fileName = currentFileName || 'visuel';
+        const baseName = fileName.replace(/\.[^.]+$/, '');
+        const processedName = type === 'color'
+          ? `${baseName}-dtf-couleur.png`
+          : `${baseName}-dtf-white-base.png`;
+
+        fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toolType: 'dtf-studio',
+            originalFileName: fileName,
+            processedFileName: processedName,
+            originalFileData: originalDataUrl,
+            processedFileData: processedDataUrl,
+            originalFileMime: 'image/png',
+            processedFileMime: 'image/png',
+            fileSize: Math.round(originalDataUrl.length * 0.75),
+            status: 'completed',
+            creditsUsed: 1,
+            metadata: {
+              bgRemovalMode,
+              widthCm: targetWidthCm,
+              heightCm: targetHeightCm,
+              scaleFactor,
+              exportType: type,
+            },
+          }),
+        }).catch((err) => console.warn('[DTF Studio] Enregistrement projet échoué:', err));
+      }
+    } catch (saveErr) {
+      console.warn('[DTF Studio] Erreur enregistrement projet (non bloquant):', saveErr);
+    }
   };
+
 
   // Acheter pack de crédits
   const handleBuyPack = async (amount: number) => {

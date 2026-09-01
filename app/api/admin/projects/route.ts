@@ -16,9 +16,9 @@ export async function GET(req: Request) {
     const toolType = searchParams.get('toolType');
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
 
-    const query: Record<string, any> = {};
+    const query: Record<string, unknown> = {};
 
     if (toolType && toolType !== 'all') {
       query.toolType = toolType;
@@ -33,14 +33,25 @@ export async function GET(req: Request) {
     }
 
     const total = await Project.countDocuments(query);
+
+    // On inclut les base64 pour afficher les miniatures dans l'admin
+    // (limite : max 100 projets par page pour éviter une réponse trop lourde)
     const projects = await Project.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
+
+    // Ajoute des flags booléens pour que le frontend sache si les fichiers existent
+    const enriched = projects.map((p) => ({
+      ...p,
+      hasOriginalFile: !!(p.originalFileData && p.originalFileData.length > 10),
+      hasProcessedFile: !!(p.processedFileData && p.processedFileData.length > 10),
+    }));
 
     return NextResponse.json({
       success: true,
-      projects,
+      projects: enriched,
       pagination: {
         total,
         page,
@@ -48,9 +59,10 @@ export async function GET(req: Request) {
         pages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
-    console.error('Erreur API Admin GET Projects :', error);
-    return NextResponse.json({ success: false, error: error.message || 'Erreur serveur' }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erreur serveur';
+    console.error('Erreur API Admin GET Projects :', msg);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 

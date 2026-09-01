@@ -43,8 +43,14 @@ interface ProjectRecord {
   userEmail: string;
   toolType: 'dtf-studio' | 'vectorizer' | 'planche';
   originalFileName?: string;
-  originalFileUrl?: string;
   processedFileName?: string;
+  // Base64 encoded file data stored in MongoDB
+  originalFileData?: string;   // base64 pure (sans préfixe data:)
+  processedFileData?: string;  // base64 pure
+  originalFileMime?: string;
+  processedFileMime?: string;
+  // Legacy URL fields (anciens projets)
+  originalFileUrl?: string;
   processedFileUrl?: string;
   fileSize?: number;
   status: 'completed' | 'failed' | 'processing';
@@ -203,21 +209,39 @@ export default function AdminPage() {
     }
   };
 
-  // Download File via Admin API
-  const handleDownloadProjectFile = async (projectId: string, type: 'original' | 'processed') => {
+  // Download File via Admin API — reçoit un vrai fichier binaire
+  const handleDownloadProjectFile = async (projectId: string, type: 'original' | 'processed', fileName?: string) => {
     try {
       const res = await fetch(`/api/admin/projects/${projectId}/download?type=${type}`);
-      const data = await res.json();
-      if (data.success && data.downloadUrl) {
-        const a = document.createElement('a');
-        a.href = data.downloadUrl;
-        a.download = data.fileName || 'export-vxel.png';
-        a.click();
-      } else {
-        showToast(data.error || 'Fichier non téléchargeable directement', 'error');
+
+      // Si l'API répond JSON c'est une erreur (fichier manquant)
+      const contentType = res.headers.get('Content-Type') || '';
+      if (!res.ok || contentType.includes('application/json')) {
+        const data = await res.json().catch(() => ({}));
+        const isLegacy = data.legacy === true;
+        showToast(
+          isLegacy
+            ? '📦 Fichier non disponible (projet antérieur à la v2)'
+            : (data.error || 'Fichier non téléchargeable'),
+          'error'
+        );
+        return;
       }
+
+      // Fichier binaire reçu → création blob URL → déclenchement téléchargement
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName || (type === 'original' ? 'original.png' : 'export.png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      showToast(`✅ Fichier téléchargé : ${a.download}`, 'success');
     } catch (err) {
-      showToast('Erreur téléchargement', 'error');
+      console.error('Erreur téléchargement admin:', err);
+      showToast('Erreur réseau lors du téléchargement', 'error');
     }
   };
 
@@ -564,7 +588,15 @@ export default function AdminPage() {
                       {/* Original File Preview */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          {p.originalFileUrl ? (
+                          {/* Priorité : base64 > URL legacy > Non disponible */}
+                          {p.originalFileData ? (
+                            <img
+                              src={`data:${p.originalFileMime || 'image/png'};base64,${p.originalFileData}`}
+                              alt="Original"
+                              onClick={() => setPreviewImageUrl(`data:${p.originalFileMime || 'image/png'};base64,${p.originalFileData}`)}
+                              className="w-9 h-9 object-cover rounded-lg border border-[#2E2E2E] cursor-pointer hover:scale-110 transition-transform"
+                            />
+                          ) : p.originalFileUrl ? (
                             <img
                               src={p.originalFileUrl}
                               alt="Original"
@@ -572,26 +604,43 @@ export default function AdminPage() {
                               className="w-9 h-9 object-cover rounded-lg border border-[#2E2E2E] cursor-pointer hover:scale-110 transition-transform"
                             />
                           ) : (
-                            <span className="text-slate-500 font-mono">No Preview</span>
+                            <span className="text-slate-600 text-[10px] font-mono bg-[#1A1A1A] px-2 py-1 rounded">Non dispo.</span>
                           )}
-                          <span className="truncate max-w-[120px] text-slate-300">{p.originalFileName || 'visuel.png'}</span>
+                          <span className="truncate max-w-[110px] text-slate-300 text-[11px]">{p.originalFileName || 'visuel.png'}</span>
                         </div>
                       </td>
 
                       {/* Processed File Preview */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          {p.processedFileUrl ? (
+                          {p.processedFileData ? (
+                            p.processedFileMime === 'image/svg+xml' ? (
+                              // SVG : affiche une icône + nom (pas de preview inline)
+                              <div
+                                onClick={() => setPreviewImageUrl(`data:image/svg+xml;base64,${p.processedFileData}`)}
+                                className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#F7941D]/60 bg-[#0A0A0A] cursor-pointer hover:scale-110 transition-transform text-[#F7941D] text-[10px] font-bold"
+                              >
+                                SVG
+                              </div>
+                            ) : (
+                              <img
+                                src={`data:${p.processedFileMime || 'image/png'};base64,${p.processedFileData}`}
+                                alt="Export"
+                                onClick={() => setPreviewImageUrl(`data:${p.processedFileMime || 'image/png'};base64,${p.processedFileData}`)}
+                                className="w-9 h-9 object-cover rounded-lg border border-[#F7941D]/60 cursor-pointer hover:scale-110 transition-transform bg-[#0A0A0A]"
+                              />
+                            )
+                          ) : p.processedFileUrl ? (
                             <img
                               src={p.processedFileUrl}
-                              alt="Processed"
+                              alt="Export"
                               onClick={() => setPreviewImageUrl(p.processedFileUrl!)}
                               className="w-9 h-9 object-cover rounded-lg border border-[#F7941D]/60 cursor-pointer hover:scale-110 transition-transform bg-[#0A0A0A]"
                             />
                           ) : (
-                            <span className="text-slate-500 font-mono">No Export</span>
+                            <span className="text-slate-600 text-[10px] font-mono bg-[#1A1A1A] px-2 py-1 rounded">Non dispo.</span>
                           )}
-                          <span className="truncate max-w-[120px] text-slate-300">{p.processedFileName || 'export.png'}</span>
+                          <span className="truncate max-w-[110px] text-slate-300 text-[11px]">{p.processedFileName || 'export.png'}</span>
                         </div>
                       </td>
 
@@ -616,10 +665,12 @@ export default function AdminPage() {
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {/* Bouton télécharger — désactivé si aucun fichier disponible */}
                           <button
-                            onClick={() => handleDownloadProjectFile(p._id, 'processed')}
-                            title="Télécharger l'export"
-                            className="p-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-[#F7941D] rounded-xl transition-all"
+                            onClick={() => handleDownloadProjectFile(p._id, 'processed', p.processedFileName)}
+                            disabled={!p.processedFileData && !p.processedFileUrl}
+                            title={p.processedFileData ? `Télécharger ${p.processedFileName}` : 'Fichier non disponible'}
+                            className="p-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-[#F7941D] rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -640,6 +691,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
 
         {/* TAB 3: STATISTIQUES */}
         {activeTab === 'stats' && (
