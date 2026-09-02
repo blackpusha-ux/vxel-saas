@@ -67,9 +67,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     // --- Décodage base64 → buffer binaire ---
-    let buffer: Buffer;
+    let binaryData: Uint8Array;
     try {
-      buffer = Buffer.from(base64Data, 'base64');
+      binaryData = new Uint8Array(Buffer.from(base64Data, 'base64'));
     } catch {
       return NextResponse.json({ success: false, error: 'Données fichier corrompues' }, { status: 500 });
     }
@@ -78,16 +78,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const headers = new Headers({
       'Content-Type': mime,
       'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
-      'Content-Length': buffer.byteLength.toString(),
+      'Content-Length': binaryData.byteLength.toString(),
       'Cache-Control': 'no-store',
     });
 
     console.log(
       `[AdminDownload] Projet ${projectId} — type=${type}, mime=${mime}, ` +
-        `taille=${Math.round(buffer.byteLength / 1024)}KB, fichier=${fileName}`
+        `taille=${Math.round(binaryData.byteLength / 1024)}KB, fichier=${fileName}`
     );
 
-    return new Response(buffer, { status: 200, headers });
+    return new Response(binaryData, { status: 200, headers });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Erreur serveur';
     console.error('Erreur API Admin Download Project :', msg);
