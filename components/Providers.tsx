@@ -10,6 +10,7 @@ import React from 'react';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { CurrencyProvider } from '@/lib/CurrencyContext';
 import { AppProvider } from '@/contexts/AppContext';
+import ChatWidget from '@/components/ChatWidget';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -17,8 +18,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <LanguageProvider>
         <CurrencyProvider>
           {children}
+          <ChatWidget />
         </CurrencyProvider>
       </LanguageProvider>
     </AppProvider>
   );
 }
+

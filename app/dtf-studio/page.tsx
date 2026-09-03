@@ -111,20 +111,53 @@ function removeBackgroundByColor(
   targetColor: { r: number; g: number; b: number },
   tolerance: number
 ) {
-  const data = imageData.data;
+  const { data, width: w, height: h } = imageData;
   const threshold = tolerance * 4.5;
-  for (let i = 0; i < data.length; i += 4) {
+  const visited = new Uint8Array(w * h);
+  const queue: number[] = [];
+
+  // Ensemencement depuis les 4 bords du visuel (perimeter seeds)
+  for (let x = 0; x < w; x++) {
+    queue.push(x); // haut
+    queue.push((h - 1) * w + x); // bas
+  }
+  for (let y = 1; y < h - 1; y++) {
+    queue.push(y * w); // gauche
+    queue.push(y * w + (w - 1)); // droite
+  }
+
+  // Flood-fill BFS pour supprimer uniquement le fond connecté
+  let head = 0;
+  while (head < queue.length) {
+    const idx = queue[head++];
+    if (visited[idx]) continue;
+    visited[idx] = 1;
+
+    const i4 = idx * 4;
+    const a = data[i4 + 3];
+    if (a < 10) continue; // déjà transparent
+
     const dist = Math.hypot(
-      data[i] - targetColor.r,
-      data[i + 1] - targetColor.g,
-      data[i + 2] - targetColor.b
+      data[i4] - targetColor.r,
+      data[i4 + 1] - targetColor.g,
+      data[i4 + 2] - targetColor.b
     );
-    if (dist < threshold) {
-      data[i + 3] = 0;
+
+    if (dist <= threshold) {
+      data[i4 + 3] = 0; // suppression fond
+
+      const x = idx % w;
+      const y = Math.floor(idx / w);
+      if (x > 0 && !visited[idx - 1]) queue.push(idx - 1);
+      if (x < w - 1 && !visited[idx + 1]) queue.push(idx + 1);
+      if (y > 0 && !visited[idx - w]) queue.push(idx - w);
+      if (y < h - 1 && !visited[idx + w]) queue.push(idx + w);
     }
   }
+
   return imageData;
 }
+
 
 /**
  * detectAndRemoveWatermarks — Détecte et supprime les watermarks/overlays :

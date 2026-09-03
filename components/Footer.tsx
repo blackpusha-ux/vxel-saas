@@ -33,8 +33,18 @@ export default function Footer({ onOpenContact }: FooterProps) {
               </Link>
             </li>
             <li>
+              <Link href="/vectoriseur" className="hover:text-[#F7941D] transition-colors">
+                Image to Vector
+              </Link>
+            </li>
+            <li>
               <Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors">
                 Outil Planche DTF
+              </Link>
+            </li>
+            <li>
+              <Link href="/generate" className="hover:text-[#F7941D] transition-colors text-[#F7941D]">
+                ✨ Générateur IA (Gratuit)
               </Link>
             </li>
             <li>

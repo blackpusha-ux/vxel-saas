@@ -110,6 +110,42 @@ export default function VectorizerTool() {
     };
   }, [originalFile]);
 
+// Filtre médian 3x3 pour éliminer le bruit et les artefacts de compression sans flouter les contours
+function applyMedianFilter(imageData: ImageData): ImageData {
+  const { data, width: w, height: h } = imageData;
+  const copy = new Uint8ClampedArray(data);
+  const rBuf: number[] = new Array(9);
+  const gBuf: number[] = new Array(9);
+  const bBuf: number[] = new Array(9);
+
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = (y * w + x) * 4;
+      if (copy[idx + 3] < 20) continue; // transparent
+
+      let k = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nIdx = ((y + dy) * w + (x + dx)) * 4;
+          rBuf[k] = copy[nIdx];
+          gBuf[k] = copy[nIdx + 1];
+          bBuf[k] = copy[nIdx + 2];
+          k++;
+        }
+      }
+
+      rBuf.sort((a, b) => a - b);
+      gBuf.sort((a, b) => a - b);
+      bBuf.sort((a, b) => a - b);
+
+      data[idx] = rBuf[4];
+      data[idx + 1] = gBuf[4];
+      data[idx + 2] = bBuf[4];
+    }
+  }
+  return imageData;
+}
+
   const runVectorization = useCallback((
     file: File,
     colorsCountVal?: number,
@@ -139,36 +175,38 @@ export default function VectorizerTool() {
 
     const img = new Image();
     img.onload = () => {
-      // Redimensionne si très grande (perf + qualité)
-      let targetW = img.width;
-      let targetH = img.height;
-      const MAX_DIM = 1200;
-      if (Math.max(targetW, targetH) > MAX_DIM) {
-        const ratio = MAX_DIM / Math.max(targetW, targetH);
-        targetW = Math.round(targetW * ratio);
-        targetH = Math.round(targetH * ratio);
-      }
+      // 1. Upscaling automatique : 4x si image < 2000px, sinon 2x
+      const maxDim = Math.max(img.width, img.height);
+      const scale = maxDim < 2000 ? 4 : 2;
+      const targetW = img.width * scale;
+      const targetH = img.height * scale;
 
-      const canvas = document.createElement('canvas');
+      let canvas: HTMLCanvasElement | null = document.createElement('canvas');
       canvas.width = targetW;
       canvas.height = targetH;
-      const ctx = canvas.getContext('2d');
+      let ctx: CanvasRenderingContext2D | null = canvas.getContext('2d');
       if (!ctx) {
         setIsProcessing(false);
         setErrorMessage('Erreur canvas');
         return;
       }
 
-      // Rendu haute qualité avec lissage
+      // Rendu haute fidélité (Lanczos / Bicubic lissé)
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, targetW, targetH);
-      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      let imageData: ImageData | null = ctx.getImageData(0, 0, targetW, targetH);
 
-      setProgress(30);
+      // 2. Filtre médian 3x3 pour éliminer le bruit avant vectorisation
+      setProgress(25);
+      setProgressLabel('Filtrage du bruit (filtre médian)...');
+      applyMedianFilter(imageData);
+
+      setProgress(40);
       setProgressLabel('Analyse des couleurs...');
 
       if (workerRef.current) {
+        // 3. Paramètres Potrace / VTracer optimisés : turdsize=100, pathomit=8, alphamax=1.0
         workerRef.current.postMessage({
           imageData,
           width: targetW,
@@ -182,6 +220,9 @@ export default function VectorizerTool() {
             path_precision: precVal ?? pathPrecision,
             smoothness: smoothVal ?? smoothness,
             min_shape_size: minSizeVal ?? minShapeSize,
+            turdsize: 100,
+            pathomit: 8,
+            alphamax: 1.0,
             layer_difference: 16,
             color_precision: 6,
           },
@@ -192,6 +233,15 @@ export default function VectorizerTool() {
         setIsProcessing(false);
         setErrorMessage('Module de conversion indisponible');
       }
+
+      // 4. Libération mémoire après chaque étape
+      imageData = null;
+      ctx = null;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+        canvas = null;
+      }
     };
 
     img.onerror = () => {
@@ -201,6 +251,7 @@ export default function VectorizerTool() {
 
     img.src = objectUrl;
   }, [noiseFilter, numColors, pathPrecision, smoothness, minShapeSize, t]);
+
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

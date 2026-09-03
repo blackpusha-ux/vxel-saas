@@ -12,9 +12,12 @@ self.onmessage = function (e) {
     const numColors     = Math.min(32, Math.max(2, options.number_of_colors || 16));
     const filterSpeckle = Math.max(0, options.filter_speckle || 4);
     const pathPrecision = Math.max(1, Math.min(8, options.path_precision || 4));
+    const turdSize      = Math.max(10, options.turdsize || 100); // Seuil de suppression bruit Potrace
+    const pathOmit      = Math.max(2, options.pathomit || 8);     // Seuil omission tracés parasites
+    const alphaMax      = options.alphamax !== undefined ? options.alphamax : 1.0;
 
     // ── Tolérance Douglas-Peucker : plus pathPrecision est haut, plus c'est fin ──
-    const dpTolerance = Math.max(0.3, 4.5 - pathPrecision * 0.5);
+    const dpTolerance = Math.max(0.3, (4.5 - pathPrecision * 0.5) * (alphaMax / 1.0));
 
     // ── 1. PRÉ-TRAITEMENT ─────────────────────────────────────────────────────
     const raw = new Uint8ClampedArray(imageData.data);
@@ -53,8 +56,8 @@ self.onmessage = function (e) {
         if (colorIndex[i] === c) { mask[i] = 1; pixCount++; }
       }
 
-      // Ignorer les couches trop petites (filtre speckle)
-      const minPixels = Math.max(4, filterSpeckle * filterSpeckle * 2);
+      // Ignorer les couches trop petites (filtre speckle & pathomit)
+      const minPixels = Math.max(turdSize, Math.max(pathOmit * pathOmit, filterSpeckle * filterSpeckle * 2));
       if (pixCount < minPixels) continue;
 
       // Marching squares → liste de contours (polygones)
@@ -65,7 +68,7 @@ self.onmessage = function (e) {
       for (const contour of contours) {
         if (contour.length < 4) continue;
 
-        // Filtrer les minuscules contours (bruit)
+        // Filtrer les minuscules contours (bruit / turdsize)
         if (contourArea(contour) < minPixels) continue;
 
         // Simplification Douglas-Peucker

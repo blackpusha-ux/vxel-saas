@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ContactModal from '@/components/ContactModal';
+import BeforeAfterSlider from '@/components/BeforeAfterSlider';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   Sparkles,
@@ -137,6 +138,50 @@ export default function HomePage() {
                 <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
+          </div>
+        </section>
+
+        {/* Section: Démonstration Avant / Après Interactive */}
+        <section className="max-w-7xl mx-auto px-4 space-y-10">
+          <div className="text-center space-y-3 max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#161616] border border-[#F7941D]/30 text-xs font-bold text-[#F7941D]">
+              <Sparkle className="w-3.5 h-3.5 text-[#F7941D]" />
+              <span>{t('home.demo.badge')}</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-white">{t('home.demo.title')}</h2>
+            <p className="text-xs sm:text-sm text-slate-400">{t('home.demo.subtitle')}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <BeforeAfterSlider
+              beforeImage="/demo/demo1-before.svg"
+              afterImage="/demo/demo1-after.svg"
+              title={t('home.demo.slide1Title')}
+              description={t('home.demo.slide1Desc')}
+              beforeLabel={t('home.demo.before')}
+              afterLabel={t('home.demo.after')}
+              initialPosition={45}
+            />
+
+            <BeforeAfterSlider
+              beforeImage="/demo/demo2-before.svg"
+              afterImage="/demo/demo2-after.svg"
+              title={t('home.demo.slide2Title')}
+              description={t('home.demo.slide2Desc')}
+              beforeLabel={t('home.demo.before')}
+              afterLabel={t('home.demo.after')}
+              initialPosition={50}
+            />
+
+            <BeforeAfterSlider
+              beforeImage="/demo/demo3-before.svg"
+              afterImage="/demo/demo3-after.svg"
+              title={t('home.demo.slide3Title')}
+              description={t('home.demo.slide3Desc')}
+              beforeLabel={t('home.demo.before')}
+              afterLabel={t('home.demo.after')}
+              initialPosition={55}
+            />
           </div>
         </section>
 

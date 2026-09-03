@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { UserButton, useUser, SignInButton, SignUpButton } from '@clerk/nextjs';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Layers, Wand2, Zap, CreditCard, Mail, Menu, X, Settings } from 'lucide-react';
+import { Layers, Wand2, Zap, CreditCard, Mail, Menu, X, Settings, Sparkles } from 'lucide-react';
 
 const ADMIN_EMAIL = 'contact.tbalbiza@gmail.com';
 
@@ -62,6 +62,10 @@ export default function Header({ onOpenContact }: HeaderProps) {
           <Link href="/dtf-planche" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-[#F7941D]" />
             <span>Outil Planche</span>
+          </Link>
+          <Link href="/generate" className="hover:text-[#F7941D] transition-colors flex items-center gap-1.5 text-[#F7941D]">
+            <Sparkles className="w-3.5 h-3.5 text-[#F7941D]" />
+            <span>Générateur IA</span>
           </Link>
           <Link href="/pricing" className="hover:text-[#F7941D] transition-colors">
             {t('common.viewPricing')}
@@ -139,6 +143,10 @@ export default function Header({ onOpenContact }: HeaderProps) {
           </Link>
           <Link href="/dtf-planche" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D]">
             Outil Planche DTF
+          </Link>
+          <Link href="/generate" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[#F7941D] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#F7941D]" />
+            <span>Générateur IA</span>
           </Link>
           <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2">
             {t('common.viewPricing')}
