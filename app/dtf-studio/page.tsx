@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+
 import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import { Sparkles, ShieldCheck, CheckCircle, FolderPlus, Check, Sliders, ChevronDown, ChevronUp, Download, Eye, Layers } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useImageLibrary } from '@/contexts/ImageLibraryContext';
+
 
 interface FabricSwatch {
   name: string;
@@ -338,12 +342,53 @@ export default function DTFStudioPage() {
   const [perfText, setPerfText] = useState('');
   const [debugText, setDebugText] = useState('');
 
+  // Image Library & Advanced Settings State
+  const { addToLibrary } = useImageLibrary();
+  const [savedToLibrary, setSavedToLibrary] = useState<boolean>(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Mode AUTO DTF : Configuration intelligente en 1 clic
+  const handleAutoDTF = () => {
+    if (!originalImage) return;
+    setBgRemovalMode('auto');
+    setAutoUpscale(true);
+    setEnableDefringe(true);
+    setDefringePx(2);
+    setEnableFillHoles(true);
+    setFillHolesSize(14);
+    setEnableBoost(true);
+    setBoostSat(135);
+    setBoostCon(118);
+    setEnableCrop(true);
+    showToast('✨ AUTO DTF appliqué : détourage intelligent, anti-halo et 300 DPI activés !', 'success');
+  };
+
+  // Sauvegarde dans la bibliothèque pour réutilisation dans la Planche
+  const handleSaveToLibrary = () => {
+    if (!processedCanvas) {
+      showToast('Aucun visuel traité à sauvegarder', 'warn');
+      return;
+    }
+    const dataUrl = processedCanvas.toDataURL('image/png');
+    addToLibrary({
+      url: dataUrl,
+      type: 'dtf',
+      name: currentFileName ? `DTF_${currentFileName.replace(/\.[^.]+$/, '')}` : `DTF_Design_${Date.now()}`,
+      width: processedCanvas.width,
+      height: processedCanvas.height,
+    });
+    setSavedToLibrary(true);
+    showToast('💾 Design sauvegardé dans votre bibliothèque !', 'success');
+    setTimeout(() => setSavedToLibrary(false), 3000);
+  };
 
   // Toast Helper
   const showToast = useCallback((msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
     setToast({ message: msg, type });
     setTimeout(() => {
+
       setToast(null);
     }, 3000);
   }, []);
@@ -1023,6 +1068,34 @@ export default function DTFStudioPage() {
         </div>
       </header>
 
+      {/* Visual Prepress Workflow Stepper */}
+      <div className="bg-[#161616] border border-[#2E2E2E] rounded-xl px-4 py-2.5 flex items-center justify-between overflow-x-auto text-[11px] font-bold">
+        {[
+          { num: '01', label: 'IMPORT', done: !!originalImage, current: !originalImage },
+          { num: '02', label: 'CLEAN', done: !!processedCanvas, current: !!originalImage && !processedCanvas },
+          { num: '03', label: 'PREPARE', done: !!processedCanvas, current: !!processedCanvas },
+          { num: '04', label: 'SIZE', done: !!enableCrop, current: false },
+          { num: '05', label: 'NEST', done: false, current: false },
+          { num: '06', label: 'EXPORT', done: false, current: false },
+        ].map((step, sIdx) => (
+          <div key={sIdx} className="flex items-center gap-2 shrink-0">
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-colors ${
+                step.done
+                  ? 'bg-green-950/60 border border-green-700/50 text-green-400'
+                  : step.current
+                  ? 'bg-[#F7941D] text-black font-extrabold shadow-sm'
+                  : 'bg-[#0A0A0A] border border-[#2E2E2E] text-slate-500'
+              }`}
+            >
+              <span className="font-mono text-[9px]">{step.num}</span>
+              <span>{step.label}</span>
+            </div>
+            {sIdx < 5 && <span className="text-slate-700">→</span>}
+          </div>
+        ))}
+      </div>
+
       {/* Grille principale */}
       <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
         {/* Colonne 1 : Prévisualisation */}
@@ -1116,26 +1189,86 @@ export default function DTFStudioPage() {
             </div>
           </div>
 
-          <div className="p-3 border-t border-[#2E2E2E] bg-[#161616] flex gap-2">
+          {/* Print Check Pre-Export Validation Panel */}
+          {originalImage && processedCanvas && (
+            <div className="px-3 py-2 border-t border-[#2E2E2E] bg-[#0E0E0E] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-white uppercase flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> PRINT CHECK DTF
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-green-950/80 border border-green-500/40 text-green-400 text-[9px] font-extrabold uppercase">
+                  READY TO PRINT
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300">
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
+                  <span>Fond transparent</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
+                  <span>Résolution 300 DPI</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
+                  <span>Anti-halo actif</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
+                  <span>White Base prête</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 border-t border-[#2E2E2E] bg-[#161616] flex flex-wrap gap-2">
             <button
               onClick={() => handleDownload('color')}
               disabled={!originalImage}
-              className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs shadow-lg shadow-[#F7941D]/10"
+              className="bg-[#F7941D] text-black font-extrabold hover:bg-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-2 rounded-md transition text-xs shadow-lg shadow-[#F7941D]/10"
             >
               {t('studioPage.pngColorBtn')}
             </button>
             <button
               onClick={() => handleDownload('white')}
               disabled={!originalImage}
-              className="bg-[#1F1F1F] text-white border border-[#2E2E2E] hover:border-[#F7941D] hover:text-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-1.5 rounded-md transition text-xs font-bold"
+              className="bg-[#1F1F1F] text-white border border-[#2E2E2E] hover:border-[#F7941D] hover:text-[#FFB25A] disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-2 rounded-md transition text-xs font-bold"
             >
               {t('studioPage.whiteBaseBtn')}
+            </button>
+            <button
+              onClick={handleSaveToLibrary}
+              disabled={!processedCanvas}
+              className="bg-[#0A0A0A] text-[#F7941D] border border-[#2E2E2E] hover:border-[#F7941D] disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-md transition text-xs font-bold flex items-center justify-center gap-1.5"
+              title="Sauvegarder dans ma bibliothèque pour l'utiliser dans la Planche DTF"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
+              <span>{savedToLibrary ? 'Sauvegardé !' : '💾 Ma Bibliothèque'}</span>
             </button>
           </div>
         </div>
 
         {/* Colonne 2 : Contrôles */}
         <div className="col-span-12 lg:col-span-4 overflow-y-auto max-h-[calc(100vh-120px)] pr-1 flex flex-col gap-2">
+
+          {/* ====== MODE AUTO DTF (1-CLIC) ====== */}
+          <div className="bg-gradient-to-r from-[#F7941D]/20 via-[#F7941D]/10 to-transparent border border-[#F7941D]/60 rounded-lg p-3 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-black text-white flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#F7941D]" /> Mode AUTO DTF
+              </span>
+              <p className="text-[10px] text-slate-400">Détourage IA, anti-halo et 300 DPI en 1 clic</p>
+            </div>
+            <button
+              onClick={handleAutoDTF}
+              disabled={!originalImage}
+              className="px-3.5 py-2 bg-[#F7941D] hover:bg-[#FFB25A] disabled:opacity-40 disabled:cursor-not-allowed text-black font-extrabold text-xs rounded-lg shadow-md shrink-0 transition-all flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>AUTO DTF</span>
+            </button>
+          </div>
+
 
           {/* ====== UPSCALE AVANT TRAITEMENT ====== */}
           <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">

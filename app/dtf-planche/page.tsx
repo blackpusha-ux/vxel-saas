@@ -2,12 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
+
 import Link from 'next/link';
-import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Download, Settings, Ruler, Printer, FolderOpen, Sparkles, Layers, Percent } from 'lucide-react';
 import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
 import { useTranslation } from '@/hooks/useTranslation';
 import { generateDTXFile } from '@/lib/dtf-export';
 import ExportFormatModal, { PlancheFormatOption } from '@/components/ExportFormatModal';
+import ImageLibraryModal from '@/components/ImageLibraryModal';
+import { useImageLibrary, LibraryItem } from '@/contexts/ImageLibraryContext';
 import { DTFMachineItem } from '@/lib/dtf-machines';
 
 interface QueueItem {
@@ -24,7 +27,9 @@ export default function DTFPlanchePage() {
   const [machineWidth, setMachineWidth] = useState<number>(58);
   const [gutterSize, setGutterSize] = useState<number>(10);
   const [previewDimensions, setPreviewDimensions] = useState<string>('—');
+  const [isLibraryOpen, setIsLibraryOpen] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
 
   // Modal State for Machine-Guided Export
   const [showExportModal, setShowExportModal] = useState(false);
@@ -227,11 +232,22 @@ export default function DTFPlanchePage() {
     }
   };
 
+  const layout = calculateLayout();
+  const totalArtworkAreaCm2 = printQueue.reduce((acc, it) => acc + (it.w * it.h), 0);
+  const totalFilmAreaCm2 = machineWidth * Math.max(1, layout.realHeightCm);
+  const filmUsagePct = printQueue.length > 0 ? Math.min(98, Math.round((totalArtworkAreaCm2 / totalFilmAreaCm2) * 100)) : 0;
+  const wastePct = printQueue.length > 0 ? Math.max(2, 100 - filmUsagePct) : 0;
+
+  const handleSelectFromLibrary = (item: LibraryItem) => {
+    setPrintQueue((prev) => [...prev, { src: item.url, w: tagWidth, h: tagHeight }]);
+  };
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F0F0F0] p-3 font-sans">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700&display=swap');
         .font-baloo { font-family: 'Baloo 2', cursive; }
+
         .font-nunito { font-family: 'Nunito', sans-serif; }
         .tb-btn-primary { background: #F7941D; color: #0A0A0A; font-weight: 800; transition: 0.2s; }
         .tb-btn-primary:hover { background: #FFB25A; }
@@ -242,16 +258,25 @@ export default function DTFPlanchePage() {
 
       {/* Header */}
       <header className="flex items-center justify-between bg-[#161616] border border-[#2E2E2E] rounded-lg px-4 py-2 mb-3">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link href="/" className="text-gray-400 hover:text-white text-sm flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> {t('common.home')}
           </Link>
           <h1 className="text-xl font-bold text-white font-baloo">VXEL <span className="text-[#F7941D]">Planche</span> <span className="text-xs text-gray-400 font-normal font-nunito">DTF Pro</span></h1>
-          <label className="text-xs bg-[#1F1F1F] p-2 rounded border border-[#2E2E2E] text-white flex items-center gap-2 cursor-pointer hover:bg-[#2E2E2E] transition-colors">
-            <Upload className="w-4 h-4" />
+          
+          <label className="text-xs bg-[#1F1F1F] p-2 rounded border border-[#2E2E2E] hover:border-[#F7941D] text-white flex items-center gap-2 cursor-pointer transition-colors">
+            <Upload className="w-4 h-4 text-[#F7941D]" />
             {t('planchePage.uploadBtn')}
             <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
           </label>
+
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            className="text-xs bg-[#1F1F1F] hover:bg-[#2A2A2A] border border-[#2E2E2E] hover:border-[#F7941D] text-slate-200 px-3 py-2 rounded flex items-center gap-2 font-bold transition-colors"
+          >
+            <FolderOpen className="w-4 h-4 text-[#F7941D]" />
+            <span>📚 Ma Bibliothèque</span>
+          </button>
         </div>
         <div>
           <LanguageCurrencySelector />
@@ -266,6 +291,14 @@ export default function DTFPlanchePage() {
             {t('planchePage.visualPreview')}
             <span className="text-[#F7941D] font-mono font-bold ml-1">{previewDimensions}</span>
           </div>
+
+          {printQueue.length > 0 && (
+            <div className="absolute top-2 right-2 z-10 bg-black/80 px-3 py-1.5 rounded text-xs border border-[#2E2E2E] flex items-center gap-3 font-mono">
+              <span className="text-green-400 font-bold">Film utile: {filmUsagePct}%</span>
+              <span className="text-slate-400">Gaspillage: {wastePct}%</span>
+            </div>
+          )}
+
           <div className="flex-1 w-full h-full overflow-auto flex justify-center items-start p-5"
                style={{
                  backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
@@ -278,6 +311,13 @@ export default function DTFPlanchePage() {
                 <Upload className="w-16 h-16 mb-4 text-[#F7941D] opacity-80 animate-bounce" />
                 <p className="text-sm font-bold text-[#0A0A0A] mb-1">{t('planchePage.emptyTitle')}</p>
                 <p className="text-xs text-slate-600">{t('planchePage.emptySub')}</p>
+                <button
+                  onClick={() => setIsLibraryOpen(true)}
+                  className="mt-4 px-4 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-lg"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span>Choisir depuis ma bibliothèque</span>
+                </button>
               </div>
             ) : (
               <canvas ref={canvasRef} className="shadow-2xl bg-white max-w-full" />
@@ -287,6 +327,25 @@ export default function DTFPlanchePage() {
 
         {/* Col 2: Contrôles & Queue */}
         <div className="lg:col-span-5 flex flex-col gap-3 overflow-y-auto pr-1 font-nunito">
+
+          {/* Film Optimization Yield Banner */}
+          {printQueue.length > 0 && (
+            <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-3 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#F7941D]/10 border border-[#F7941D]/30 flex items-center justify-center text-[#F7941D]">
+                  <Percent className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-white block">Optimisation du film</span>
+                  <span className="text-[10px] text-slate-400">Nesting DTF automatique</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[#F7941D] font-mono font-bold text-sm">{filmUsagePct}% utilisé</span>
+                <span className="text-[10px] text-slate-500 block">~{totalArtworkAreaCm2.toFixed(0)}cm² utile</span>
+              </div>
+            </div>
+          )}
 
           <div className="section">
             <h3 className="flex items-center gap-2"><Ruler className="w-4 h-4" /> {t('planchePage.tagDimensionsTitle')}</h3>
@@ -347,6 +406,13 @@ export default function DTFPlanchePage() {
         </div>
       </div>
 
+      {/* Image Library Modal */}
+      <ImageLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelectImage={handleSelectFromLibrary}
+      />
+
       {/* Export Format Modal with Printer Selector */}
       <ExportFormatModal
         isOpen={showExportModal}
@@ -356,3 +422,4 @@ export default function DTFPlanchePage() {
     </div>
   );
 }
+

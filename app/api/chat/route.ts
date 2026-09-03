@@ -16,11 +16,12 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      // Fallback message si clé non configurée
-      return NextResponse.json({
-        reply: "Bonjour ! Le service d'assistance IA est actuellement en cours d'initialisation (clé API GROQ en attente). En attendant, nos 3 outils (Studio DTF, Image to Vector et Outil Planche) ainsi que vos 10 crédits gratuits sont immédiatement disponibles dans le menu ci-dessus !",
-      });
+      return NextResponse.json(
+        { error: 'Clé API Groq non configurée' },
+        { status: 500 }
+      );
     }
+
 
     // Préparer les messages avec le system prompt en tête
     const groqMessages = [

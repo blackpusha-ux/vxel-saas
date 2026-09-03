@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Sliders, Download, Copy, Check, RefreshCw, Zap, AlertCircle, Layers, Image as ImageIcon } from 'lucide-react';
+import { Upload, Sliders, Download, Copy, Check, RefreshCw, Zap, AlertCircle, Layers, Image as ImageIcon, FolderPlus, Bookmark } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useImageLibrary } from '@/contexts/ImageLibraryContext';
 
 interface ImageToVectorStats {
   colorCount: number;
@@ -19,8 +20,8 @@ export default function VectorizerTool() {
   const [vectorizedSvg, setVectorizedSvg] = useState<string | null>(null);
   const [stats, setStats] = useState<ImageToVectorStats | null>(null);
 
-  // Sliders State — valeurs optimisées pour les visuels complexes type DTF
-  const [numColors, setNumColors] = useState<number>(20);       // plus de couleurs par défaut
+  // Sliders State — max 12 couleurs pour éviter la saturation mémoire
+  const [numColors, setNumColors] = useState<number>(8);
   const [noiseFilter, setNoiseFilter] = useState<number>(3);    // moins agressif
   const [pathPrecision, setPathPrecision] = useState<number>(5); // plus de fidélité
   const [smoothness, setSmoothness] = useState<number>(4);      // lissage courbes (1-8)
@@ -32,83 +33,116 @@ export default function VectorizerTool() {
   const [progressLabel, setProgressLabel] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [canRetryWithLowColors, setCanRetryWithLowColors] = useState<boolean>(false);
 
   const workerRef = useRef<Worker | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearProcessingTimeout = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  const setupWorker = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (workerRef.current) {
+      workerRef.current.terminate();
+    }
+
+    const worker = new Worker('/workers/vtracer-worker.js');
+
+    worker.onmessage = async (e) => {
+      clearProcessingTimeout();
+      setIsProcessing(false);
+      setProgress(100);
+      setProgressLabel('');
+
+      if (e.data.success) {
+        setVectorizedSvg(e.data.svg);
+        setErrorMessage(null);
+        setCanRetryWithLowColors(false);
+        setStats({
+          colorCount: e.data.stats.colorCount,
+          pathCount: e.data.stats.pathCount,
+          durationMs: e.data.stats.durationMs,
+          engine: 'VTracer Pro v3',
+        });
+
+        // Save project record in MongoDB avec les fichiers en base64
+        try {
+          const svgBase64 = btoa(unescape(encodeURIComponent(e.data.svg)));
+
+          let originalBase64 = '';
+          if (originalFile) {
+            await new Promise<void>((resolve) => {
+              const tmpImg = new Image();
+              const objUrl = URL.createObjectURL(originalFile);
+              tmpImg.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = tmpImg.width;
+                c.height = tmpImg.height;
+                const cx = c.getContext('2d');
+                if (cx) { cx.drawImage(tmpImg, 0, 0); originalBase64 = c.toDataURL('image/png'); }
+                URL.revokeObjectURL(objUrl);
+                resolve();
+              };
+              tmpImg.onerror = () => { URL.revokeObjectURL(objUrl); resolve(); };
+              tmpImg.src = objUrl;
+            });
+          }
+
+          const svgFileName = `VXEL_ImageToVector_${Date.now()}.svg`;
+          fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toolType: 'vectorizer',
+              originalFileName: originalFile ? originalFile.name : 'visuel-source.png',
+              processedFileName: svgFileName,
+              originalFileData: originalBase64,
+              processedFileData: svgBase64,
+              originalFileMime: 'image/png',
+              processedFileMime: 'image/svg+xml',
+              fileSize: originalFile ? originalFile.size : 0,
+              status: 'completed',
+              creditsUsed: 1,
+            }),
+          }).catch(() => {});
+        } catch {
+          // Non bloquant
+        }
+      } else {
+        setErrorMessage(e.data.error || 'Erreur lors de la conversion Image to Vector');
+        setCanRetryWithLowColors(true);
+      }
+    };
+
+    worker.onerror = (err) => {
+      clearProcessingTimeout();
+      setIsProcessing(false);
+      setProgressLabel('');
+      console.error('VTracer Worker Crash:', err);
+      setErrorMessage("Le moteur de vectorisation s'est arrêté de manière inattendue. Veuillez réessayer avec moins de couleurs.");
+      setCanRetryWithLowColors(true);
+    };
+
+    workerRef.current = worker;
+  }, [originalFile]);
 
   // Initialize Web Worker
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      workerRef.current = new Worker('/workers/vtracer-worker.js');
-
-      workerRef.current.onmessage = async (e) => {
-        setIsProcessing(false);
-        setProgress(100);
-        setProgressLabel('');
-
-        if (e.data.success) {
-          setVectorizedSvg(e.data.svg);
-          setStats({
-            colorCount: e.data.stats.colorCount,
-            pathCount: e.data.stats.pathCount,
-            durationMs: e.data.stats.durationMs,
-            engine: 'VTracer Pro v3',
-          });
-
-          // Save project record in MongoDB avec les fichiers en base64
-          try {
-            const svgBase64 = btoa(unescape(encodeURIComponent(e.data.svg)));
-
-            let originalBase64 = '';
-            if (originalFile) {
-              await new Promise<void>((resolve) => {
-                const tmpImg = new Image();
-                const objUrl = URL.createObjectURL(originalFile);
-                tmpImg.onload = () => {
-                  const c = document.createElement('canvas');
-                  c.width = tmpImg.width;
-                  c.height = tmpImg.height;
-                  const cx = c.getContext('2d');
-                  if (cx) { cx.drawImage(tmpImg, 0, 0); originalBase64 = c.toDataURL('image/png'); }
-                  URL.revokeObjectURL(objUrl);
-                  resolve();
-                };
-                tmpImg.onerror = () => { URL.revokeObjectURL(objUrl); resolve(); };
-                tmpImg.src = objUrl;
-              });
-            }
-
-            const svgFileName = `VXEL_ImageToVector_${Date.now()}.svg`;
-            fetch('/api/projects', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                toolType: 'vectorizer',
-                originalFileName: originalFile ? originalFile.name : 'visuel-source.png',
-                processedFileName: svgFileName,
-                originalFileData: originalBase64,
-                processedFileData: svgBase64,
-                originalFileMime: 'image/png',
-                processedFileMime: 'image/svg+xml',
-                fileSize: originalFile ? originalFile.size : 0,
-                status: 'completed',
-                creditsUsed: 1,
-              }),
-            }).catch(() => {});
-          } catch {
-            // Non bloquant
-          }
-        } else {
-          setErrorMessage(e.data.error || 'Erreur lors de la conversion Image to Vector');
-        }
-      };
-    }
-
+    setupWorker();
     return () => {
+      clearProcessingTimeout();
       if (workerRef.current) {
         workerRef.current.terminate();
       }
     };
-  }, [originalFile]);
+  }, [setupWorker]);
+
 
 // Filtre médian 3x3 pour éliminer le bruit et les artefacts de compression sans flouter les contours
 function applyMedianFilter(imageData: ImageData): ImageData {
@@ -155,6 +189,7 @@ function applyMedianFilter(imageData: ImageData): ImageData {
     minSizeVal?: number,
   ) => {
     setErrorMessage(null);
+    setCanRetryWithLowColors(false);
 
     if (file.size > 50 * 1024 * 1024) {
       setErrorMessage(t('vectorizer.errorFileTooLarge'));
@@ -173,86 +208,108 @@ function applyMedianFilter(imageData: ImageData): ImageData {
     const objectUrl = URL.createObjectURL(file);
     setOriginalPreviewUrl(objectUrl);
 
+    // Limite stricte à 12 couleurs max pour éviter la saturation mémoire
+    const effectiveColors = Math.min(12, Math.max(2, colorsCountVal ?? numColors));
+
     const img = new Image();
     img.onload = () => {
-      // 1. Upscaling automatique : 4x si image < 2000px, sinon 2x
-      const maxDim = Math.max(img.width, img.height);
-      const scale = maxDim < 2000 ? 4 : 2;
-      const targetW = img.width * scale;
-      const targetH = img.height * scale;
+      try {
+        clearProcessingTimeout();
 
-      let canvas: HTMLCanvasElement | null = document.createElement('canvas');
-      canvas.width = targetW;
-      canvas.height = targetH;
-      let ctx: CanvasRenderingContext2D | null = canvas.getContext('2d');
-      if (!ctx) {
+        // 1. Timeout de 30 secondes sur le traitement
+        timeoutRef.current = setTimeout(() => {
+          setupWorker(); // Arrête et réinitialise le worker
+          setIsProcessing(false);
+          setProgressLabel('');
+          setErrorMessage("Traitement trop long - réduisez la taille de l'image ou le nombre de couleurs.");
+          setCanRetryWithLowColors(true);
+        }, 30000);
+
+        // 2. Si l'image > 1500px, réduis-la automatiquement à 1500px max AVANT traitement (LANCZOS/Bicubic)
+        let targetW = img.width;
+        let targetH = img.height;
+        const MAX_DIM = 1500;
+        if (Math.max(targetW, targetH) > MAX_DIM) {
+          const ratio = MAX_DIM / Math.max(targetW, targetH);
+          targetW = Math.round(targetW * ratio);
+          targetH = Math.round(targetH * ratio);
+        }
+
+        let canvas: HTMLCanvasElement | null = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        let ctx: CanvasRenderingContext2D | null = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Impossible d\'initialiser le contexte canvas');
+        }
+
+        // Rendu haute fidélité (Lanczos / Bicubic lissé)
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        let imageData: ImageData | null = ctx.getImageData(0, 0, targetW, targetH);
+
+        // 3. Filtre médian 3x3 pour éliminer le bruit avant vectorisation
+        setProgress(25);
+        setProgressLabel('Filtrage du bruit (filtre médian)...');
+        applyMedianFilter(imageData);
+
+        setProgress(40);
+        setProgressLabel('Analyse des couleurs...');
+
+        if (workerRef.current) {
+          // 4. Paramètres Potrace / VTracer optimisés : turdsize=100, pathomit=8, alphamax=1.0
+          workerRef.current.postMessage({
+            imageData,
+            width: targetW,
+            height: targetH,
+            options: {
+              color_mode: 'color',
+              hierarchical: 'stacked',
+              mode: 'spline',
+              filter_speckle: noiseVal ?? noiseFilter,
+              number_of_colors: effectiveColors,
+              path_precision: precVal ?? pathPrecision,
+              smoothness: smoothVal ?? smoothness,
+              min_shape_size: minSizeVal ?? minShapeSize,
+              turdsize: 100,
+              pathomit: 8,
+              alphamax: 1.0,
+              layer_difference: 16,
+              color_precision: 6,
+            },
+          });
+          setProgress(60);
+          setProgressLabel('Vectorisation en cours...');
+        } else {
+          throw new Error('Module de conversion indisponible');
+        }
+
+        // 5. Libération mémoire après chaque étape
+        imageData = null;
+        ctx = null;
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+          canvas = null;
+        }
+      } catch (err: any) {
+        clearProcessingTimeout();
         setIsProcessing(false);
-        setErrorMessage('Erreur canvas');
-        return;
-      }
-
-      // Rendu haute fidélité (Lanczos / Bicubic lissé)
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      let imageData: ImageData | null = ctx.getImageData(0, 0, targetW, targetH);
-
-      // 2. Filtre médian 3x3 pour éliminer le bruit avant vectorisation
-      setProgress(25);
-      setProgressLabel('Filtrage du bruit (filtre médian)...');
-      applyMedianFilter(imageData);
-
-      setProgress(40);
-      setProgressLabel('Analyse des couleurs...');
-
-      if (workerRef.current) {
-        // 3. Paramètres Potrace / VTracer optimisés : turdsize=100, pathomit=8, alphamax=1.0
-        workerRef.current.postMessage({
-          imageData,
-          width: targetW,
-          height: targetH,
-          options: {
-            color_mode: 'color',
-            hierarchical: 'stacked',
-            mode: 'spline',
-            filter_speckle: noiseVal ?? noiseFilter,
-            number_of_colors: colorsCountVal ?? numColors,
-            path_precision: precVal ?? pathPrecision,
-            smoothness: smoothVal ?? smoothness,
-            min_shape_size: minSizeVal ?? minShapeSize,
-            turdsize: 100,
-            pathomit: 8,
-            alphamax: 1.0,
-            layer_difference: 16,
-            color_precision: 6,
-          },
-        });
-        setProgress(60);
-        setProgressLabel('Vectorisation en cours...');
-      } else {
-        setIsProcessing(false);
-        setErrorMessage('Module de conversion indisponible');
-      }
-
-      // 4. Libération mémoire après chaque étape
-      imageData = null;
-      ctx = null;
-      if (canvas) {
-        canvas.width = 0;
-        canvas.height = 0;
-        canvas = null;
+        setErrorMessage(err?.message || 'Erreur lors de la préparation du visuel');
+        setCanRetryWithLowColors(true);
       }
     };
 
     img.onerror = () => {
+      clearProcessingTimeout();
       setIsProcessing(false);
       setErrorMessage("Impossible de lire l'image");
+      setCanRetryWithLowColors(true);
     };
 
     img.src = objectUrl;
-  }, [noiseFilter, numColors, pathPrecision, smoothness, minShapeSize, t]);
-
-
+  }, [noiseFilter, numColors, pathPrecision, smoothness, minShapeSize, t, setupWorker]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -282,6 +339,21 @@ function applyMedianFilter(imageData: ImageData): ImageData {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const { addToLibrary } = useImageLibrary();
+  const [savedToLib, setSavedToLib] = useState<boolean>(false);
+
+  const handleSaveToLibrary = () => {
+    if (!vectorizedSvg) return;
+    const svgDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(vectorizedSvg)}`;
+    addToLibrary({
+      url: svgDataUrl,
+      type: 'vector',
+      name: originalFile ? `Vector_${originalFile.name.replace(/\.[^.]+$/, '')}` : `Vector_${Date.now()}`,
+    });
+    setSavedToLib(true);
+    setTimeout(() => setSavedToLib(false), 3000);
   };
 
   const handleCopyCode = () => {
@@ -315,16 +387,16 @@ function applyMedianFilter(imageData: ImageData): ImageData {
         )}
       </div>
 
-      {/* Control Sliders Panel — 5 contrôles */}
+      {/* Control Sliders Panel — 5 contrôles (max 12 couleurs) */}
       <div className="bg-[#161616] border border-[#2E2E2E] rounded-3xl p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-5">
-        {/* Couleurs */}
+        {/* Couleurs (max 12) */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-300">
             <span>{t('vectorizer.colors')}</span>
             <span className="text-[#F7941D] font-mono">{numColors}</span>
           </div>
           <input
-            type="range" min="4" max="32" value={numColors}
+            type="range" min="2" max="12" value={numColors}
             onChange={(e) => {
               const val = parseInt(e.target.value);
               setNumColors(val);
@@ -332,7 +404,7 @@ function applyMedianFilter(imageData: ImageData): ImageData {
             }}
             className="w-full accent-[#F7941D]"
           />
-          <p className="text-[10px] text-slate-500">Palettes couleurs détectées</p>
+          <p className="text-[10px] text-slate-500">Max 12 (évite saturation)</p>
         </div>
 
         {/* Filtre bruit */}
@@ -408,11 +480,25 @@ function applyMedianFilter(imageData: ImageData): ImageData {
         </div>
       </div>
 
-      {/* Error Message */}
+      {/* Error Message & Retry with 6 colors Button */}
       {errorMessage && (
-        <div className="bg-red-950/60 border border-red-800 text-red-300 p-4 rounded-2xl text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="bg-red-950/60 border border-red-800 text-red-300 p-4 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+            <span>{errorMessage}</span>
+          </div>
+          {originalFile && (
+            <button
+              onClick={() => {
+                setNumColors(6);
+                runVectorization(originalFile, 6);
+              }}
+              className="px-4 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold rounded-xl text-xs transition-all shadow-md shrink-0 flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Réessayer avec 6 couleurs</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -477,11 +563,20 @@ function applyMedianFilter(imageData: ImageData): ImageData {
               )}
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleSaveToLibrary}
+                disabled={!vectorizedSvg}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-[#F7941D] font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                {savedToLib ? <Check className="w-4 h-4 text-green-400" /> : <FolderPlus className="w-4 h-4" />}
+                <span>{savedToLib ? 'Sauvegardé !' : '💾 Sauvegarder le SVG'}</span>
+              </button>
+
               <button
                 onClick={handleCopyCode}
                 disabled={!vectorizedSvg}
-                className="flex-1 sm:flex-initial px-4 py-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
+                className="flex-1 sm:flex-initial px-4 py-2 bg-[#0A0A0A] border border-[#2E2E2E] hover:border-[#F7941D] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
               >
                 {copiedCode ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedCode ? t('vectorizer.codeCopied') : t('vectorizer.copyCode')}</span>
@@ -490,13 +585,14 @@ function applyMedianFilter(imageData: ImageData): ImageData {
               <button
                 onClick={handleDownloadSvg}
                 disabled={!vectorizedSvg}
-                className="flex-1 sm:flex-initial px-5 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#F7941D]/20"
+                className="flex-1 sm:flex-initial px-5 py-2 bg-[#F7941D] hover:bg-[#FFB25A] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#F7941D]/20 transition-all"
               >
                 <Download className="w-4 h-4" />
                 <span>{t('vectorizer.download')}</span>
               </button>
             </div>
           </div>
+
 
           {/* Grid Avant / Après */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

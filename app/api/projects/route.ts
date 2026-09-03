@@ -4,21 +4,16 @@ import connectDB from '@/lib/db';
 import Project from '@/models/Project';
 
 // ---------------------------------------------------------------------------
-// POST /api/projects
-// Enregistre un projet avec les fichiers en base64 directement dans MongoDB.
-// Payload attendu :
-//   toolType             : 'dtf-studio' | 'vectorizer' | 'planche'
-//   originalFileName     : string (ex: "chat.png")
-//   processedFileName    : string (ex: "chat-traite.png")
-//   originalFileData     : string (base64 SANS préfixe data:... OU complet)
-//   processedFileData    : string (base64 SANS préfixe data:... OU complet)
-//   originalFileMime     : string (ex: "image/png") — optionnel, défaut: "image/png"
-//   processedFileMime    : string (ex: "image/png" | "image/svg+xml") — optionnel
-//   fileSize             : number (octets de l'original) — optionnel
-//   status               : 'completed' | 'failed' | 'processing' — optionnel
-//   creditsUsed          : number — optionnel, défaut: 1
-//   metadata             : object — optionnel
+// Sanitization Helper for SVG (Prevents XSS & Malicious Payloads)
 // ---------------------------------------------------------------------------
+function sanitizeSvgString(svg: string): string {
+  if (!svg) return '';
+  return svg
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/g, '')
+    .replace(/on\w+='[^']*'/g, '')
+    .replace(/javascript:[^"']*/gi, '');
+}
 
 /**
  * Normalise un base64 en retirant le préfixe data URI si présent.
@@ -26,15 +21,48 @@ import Project from '@/models/Project';
  */
 function parseBase64(raw: string | undefined, fallbackMime = 'image/png'): { data: string; mime: string } {
   if (!raw) return { data: '', mime: fallbackMime };
-  // Détecte "data:image/png;base64,iVBOR..."
   const match = raw.match(/^data:([^;]+);base64,(.+)$/);
   if (match) {
     return { data: match[2], mime: match[1] };
   }
-  // Déjà du base64 pur
   return { data: raw, mime: fallbackMime };
 }
 
+// ---------------------------------------------------------------------------
+// GET /api/projects
+// Récupère la liste des projets appartenant à l'utilisateur connecté (Anti-IDOR)
+// ---------------------------------------------------------------------------
+export async function GET() {
+  try {
+    const user = await currentUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+
+    await connectDB();
+
+    // Récupère les 50 derniers projets de l'utilisateur sans charger les lourds buffers de fichiers
+    const projects = await Project.find({ clerkId: user.id })
+      .select('_id toolType originalFileName processedFileName originalFileMime processedFileMime fileSize status creditsUsed metadata createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      projects,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erreur serveur';
+    console.error('Erreur récupération projets :', msg);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/projects
+// Enregistre un projet sécurisé pour l'utilisateur connecté
+// ---------------------------------------------------------------------------
 export async function POST(req: Request) {
   try {
     const user = await currentUser();
@@ -65,8 +93,24 @@ export async function POST(req: Request) {
     } = body;
 
     // Parse base64 data
-    const { data: originalFileData, mime: originalFileMime } = parseBase64(rawOriginal, mimeOrig || 'image/png');
-    const { data: processedFileData, mime: processedFileMime } = parseBase64(rawProcessed, mimeProc || 'image/png');
+    let { data: originalFileData, mime: originalFileMime } = parseBase64(rawOriginal, mimeOrig || 'image/png');
+    let { data: processedFileData, mime: processedFileMime } = parseBase64(rawProcessed, mimeProc || 'image/png');
+
+    // Security validation: max 50MB per base64 payload
+    if (originalFileData.length > 70 * 1024 * 1024 || processedFileData.length > 70 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: 'Taille de fichier excessive' }, { status: 413 });
+    }
+
+    // SVG Security Sanitization if vector
+    if (processedFileMime === 'image/svg+xml' && processedFileData) {
+      try {
+        const decodedSvg = Buffer.from(processedFileData, 'base64').toString('utf-8');
+        const cleanSvg = sanitizeSvgString(decodedSvg);
+        processedFileData = Buffer.from(cleanSvg, 'utf-8').toString('base64');
+      } catch {
+        // En cas d'erreur de décodage, continuer
+      }
+    }
 
     const project = await Project.create({
       clerkId: user.id,
@@ -84,12 +128,6 @@ export async function POST(req: Request) {
       metadata: metadata || {},
     });
 
-    console.log(
-      `[ProjectAPI] Projet ${project._id} enregistré pour ${email} (${toolType}) - ` +
-        `original: ${originalFileData ? Math.round(originalFileData.length / 1024) + 'KB' : 'vide'}, ` +
-        `processed: ${processedFileData ? Math.round(processedFileData.length / 1024) + 'KB' : 'vide'}`
-    );
-
     return NextResponse.json({
       success: true,
       projectId: project._id,
@@ -97,6 +135,40 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Erreur serveur';
     console.error('Erreur enregistrement projet :', msg);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/projects
+// Supprime un projet en vérifiant formellement l'autorisation (Anti-BOLA)
+// ---------------------------------------------------------------------------
+export async function DELETE(req: Request) {
+  try {
+    const user = await currentUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id || id.length < 10) {
+      return NextResponse.json({ success: false, error: 'ID projet manquant' }, { status: 400 });
+    }
+
+    await connectDB();
+
+    // Supprime uniquement si le projet appartient à cet utilisateur
+    const deleted = await Project.findOneAndDelete({ _id: id, clerkId: user.id });
+
+    if (!deleted) {
+      return NextResponse.json({ success: false, error: 'Projet introuvable ou non autorisé' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erreur serveur';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

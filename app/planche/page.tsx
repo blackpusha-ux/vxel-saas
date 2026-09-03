@@ -2,7 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
+
 import Link from 'next/link';
+import { FolderOpen, Upload } from 'lucide-react';
+import ImageLibraryModal from '@/components/ImageLibraryModal';
+import { useImageLibrary, LibraryItem } from '@/contexts/ImageLibraryContext';
 
 interface QueueItem {
   src: string;
@@ -16,7 +20,9 @@ export default function DTFPlanchePage() {
   const [tagHeight, setTagHeight] = useState<number>(34);
   const [machineWidth, setMachineWidth] = useState<number>(58);
   const [gutterSize, setGutterSize] = useState<number>(10);
+  const [isLibraryOpen, setIsLibraryOpen] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
 
   // 1. Chargement des images
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,12 +160,20 @@ export default function DTFPlanchePage() {
 
       {/* Header */}
       <header className="flex items-center justify-between bg-[#161616] border border-[#2E2E2E] rounded-lg px-4 py-2 mb-3">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link href="/" className="text-gray-400 hover:text-white text-sm">← Retour</Link>
           <h1 className="text-xl font-bold text-white font-baloo">VXEL <span className="text-[#F7941D]">Planche DTF Pro</span></h1>
-          <input type="file" id="imageLoader" accept="image/*" multiple onChange={handleImageUpload} className="text-xs bg-[#1F1F1F] p-1 rounded border border-[#2E2E2E] text-white" />
+          <input type="file" id="imageLoader" accept="image/*" multiple onChange={handleImageUpload} className="text-xs bg-[#1F1F1F] p-1.5 rounded border border-[#2E2E2E] text-white" />
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            className="text-xs bg-[#1F1F1F] hover:bg-[#2A2A2A] border border-[#2E2E2E] hover:border-[#F7941D] text-slate-200 px-3 py-1.5 rounded flex items-center gap-1.5 font-bold transition-colors"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-[#F7941D]" />
+            <span>📚 Ma Bibliothèque</span>
+          </button>
         </div>
       </header>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0">
         
@@ -242,6 +256,15 @@ export default function DTFPlanchePage() {
           </div>
         </div>
       </div>
+
+      {/* Image Library Modal */}
+      <ImageLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelectImage={(item) => {
+          setPrintQueue((prev) => [...prev, { src: item.url, w: tagWidth, h: tagHeight }]);
+        }}
+      />
     </div>
   );
-}
+}
