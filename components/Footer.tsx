@@ -64,13 +64,17 @@ export default function Footer({ onOpenContact }: FooterProps) {
                 {t('footer.mentionsLink')}
               </Link>
             </li>
-            {onOpenContact && (
-              <li>
+            <li>
+              {onOpenContact ? (
                 <button onClick={onOpenContact} className="hover:text-[#F7941D] transition-colors">
-                  Nous Contacter
+                  {t('footer.contact')}
                 </button>
-              </li>
-            )}
+              ) : (
+                <Link href="/contact" className="hover:text-[#F7941D] transition-colors">
+                  {t('footer.contact')}
+                </Link>
+              )}
+            </li>
           </ul>
         </div>
       </div>
