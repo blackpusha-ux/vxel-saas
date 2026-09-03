@@ -61,6 +61,176 @@ function countOpaque(data: Uint8ClampedArray) {
   return count;
 }
 
+function detectBackgroundColor(imageData: ImageData): {
+  detected: true;
+  color: { r: number; g: number; b: number };
+} | { detected: false } {
+  const { data, width: w, height: h } = imageData;
+  if (w < 1 || h < 1) return { detected: false };
+
+  const corners = [
+    { r: data[0], g: data[1], b: data[2] },
+    { r: data[(w - 1) * 4], g: data[(w - 1) * 4 + 1], b: data[(w - 1) * 4 + 2] },
+    {
+      r: data[(h - 1) * w * 4],
+      g: data[(h - 1) * w * 4 + 1],
+      b: data[(h - 1) * w * 4 + 2],
+    },
+    {
+      r: data[((h - 1) * w + (w - 1)) * 4],
+      g: data[((h - 1) * w + (w - 1)) * 4 + 1],
+      b: data[((h - 1) * w + (w - 1)) * 4 + 2],
+    },
+  ];
+
+  const avgColor = {
+    r: (corners[0].r + corners[1].r + corners[2].r + corners[3].r) / 4,
+    g: (corners[0].g + corners[1].g + corners[2].g + corners[3].g) / 4,
+    b: (corners[0].b + corners[1].b + corners[2].b + corners[3].b) / 4,
+  };
+
+  const similar = corners.every((c) => {
+    const dist = Math.hypot(c.r - avgColor.r, c.g - avgColor.g, c.b - avgColor.b);
+    return dist <= 30;
+  });
+
+  if (!similar) return { detected: false };
+
+  return {
+    detected: true,
+    color: {
+      r: Math.round(avgColor.r),
+      g: Math.round(avgColor.g),
+      b: Math.round(avgColor.b),
+    },
+  };
+}
+
+function removeBackgroundByColor(
+  imageData: ImageData,
+  targetColor: { r: number; g: number; b: number },
+  tolerance: number
+) {
+  const data = imageData.data;
+  const threshold = tolerance * 4.5;
+  for (let i = 0; i < data.length; i += 4) {
+    const dist = Math.hypot(
+      data[i] - targetColor.r,
+      data[i + 1] - targetColor.g,
+      data[i + 2] - targetColor.b
+    );
+    if (dist < threshold) {
+      data[i + 3] = 0;
+    }
+  }
+  return imageData;
+}
+
+/**
+ * detectAndRemoveWatermarks — Détecte et supprime les watermarks/overlays :
+ * 1) Zones semi-transparentes (alpha 50–200) → directement supprimées
+ * 2) Pixels isolés à fort contraste sur fond uniforme (logos/texte overlay)
+ *    → remplacés par interpolation des voisins (inpainting simple 3×3)
+ * intensity: 0–1 (contrôle la sensibilité de détection)
+ */
+function detectAndRemoveWatermarks(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  intensity: number
+) {
+  const contrastThreshold = Math.round(80 - intensity * 50); // 30–80
+  const watermarkMask = new Uint8Array(w * h); // 1 = pixel watermark
+
+  // Passe 1 : zones semi-transparentes (alpha entre 50 et 200)
+  for (let i = 0; i < w * h; i++) {
+    const alpha = data[i * 4 + 3];
+    if (alpha > 50 && alpha < 200) {
+      watermarkMask[i] = 1;
+    }
+  }
+
+  // Passe 2 : détection contraste élevé sur fond uniforme
+  // Pour chaque pixel, on compare sa couleur à la moyenne de son voisinage 5×5
+  const radius = 2;
+  for (let y = radius; y < h - radius; y++) {
+    for (let x = radius; x < w - radius; x++) {
+      const idx = (y * w + x) * 4;
+      if (data[idx + 3] < 20) continue; // transparent → skip
+
+      let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const ni = ((y + dy) * w + (x + dx)) * 4;
+          if (data[ni + 3] > 20) {
+            sumR += data[ni]; sumG += data[ni + 1]; sumB += data[ni + 2];
+            cnt++;
+          }
+        }
+      }
+      if (cnt === 0) continue;
+
+      const avgR = sumR / cnt, avgG = sumG / cnt, avgB = sumB / cnt;
+      const dist = Math.hypot(data[idx] - avgR, data[idx + 1] - avgG, data[idx + 2] - avgB);
+
+      // Pixel très différent de ses voisins = potentiel watermark overlay
+      if (dist > contrastThreshold) {
+        // Vérification supplémentaire : les voisins sont homogènes (fond uniforme)
+        let varR = 0, varG = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const ni = ((y + dy) * w + (x + dx)) * 4;
+            if (data[ni + 3] > 20) {
+              varR += (data[ni] - avgR) ** 2;
+              varG += (data[ni + 1] - avgG) ** 2;
+            }
+          }
+        }
+        const uniformity = Math.sqrt((varR + varG) / (cnt * 2));
+        // Si fond uniforme (variance basse) + pixel très contrasté → watermark
+        if (uniformity < 25) {
+          watermarkMask[y * w + x] = 1;
+        }
+      }
+    }
+  }
+
+  // Passe 3 : inpainting — remplace les pixels watermark par la moyenne des voisins non-watermark
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!watermarkMask[y * w + x]) continue;
+
+      let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
+      const nr = 3; // rayon inpainting
+      for (let dy = -nr; dy <= nr; dy++) {
+        for (let dx = -nr; dx <= nr; dx++) {
+          const ny = y + dy, nx = x + dx;
+          if (ny < 0 || ny >= h || nx < 0 || nx >= w) continue;
+          const ni = ny * w + nx;
+          if (!watermarkMask[ni] && data[ni * 4 + 3] > 20) {
+            sumR += data[ni * 4]; sumG += data[ni * 4 + 1]; sumB += data[ni * 4 + 2];
+            cnt++;
+          }
+        }
+      }
+
+      const base = (y * w + x) * 4;
+      if (cnt > 0) {
+        // Remplace par la couleur du fond environnant
+        data[base]     = Math.round(sumR / cnt);
+        data[base + 1] = Math.round(sumG / cnt);
+        data[base + 2] = Math.round(sumB / cnt);
+        data[base + 3] = 255; // opaque
+      } else {
+        // Aucun voisin valide → on supprime
+        data[base + 3] = 0;
+      }
+    }
+  }
+}
+
 export default function DTFStudioPage() {
   const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
@@ -117,6 +287,14 @@ export default function DTFStudioPage() {
   const [grungeIntensity, setGrungeIntensity] = useState(30);
 
   const [scaleFactor, setScaleFactor] = useState(2);
+  // === UPSCALE AUTOMATIQUE INTELLIGENT ===
+  const [autoUpscale, setAutoUpscale] = useState(true); // activé par défaut
+  // === COULEUR DE FOND DÉTECTÉE (affichage UI) ===
+  const [detectedBgColor, setDetectedBgColor] = useState<{ r: number; g: number; b: number } | null>(null);
+  // === SUPPRESSION WATERMARKS ===
+  const [enableWatermarkRemoval, setEnableWatermarkRemoval] = useState(false);
+  const [watermarkIntensity, setWatermarkIntensity] = useState(50);
+
   const [enableCrop, setEnableCrop] = useState(true);
   const [fitMode, setFitMode] = useState<'tight' | 'frame'>('tight');
   const [targetWidthCm, setTargetWidthCm] = useState(29);
@@ -174,11 +352,21 @@ export default function DTFStudioPage() {
   const processImage = useCallback(() => {
     if (!originalImage) return;
 
-    setIsProcessing(true);
-
     setTimeout(() => {
+      try {
+      setIsProcessing(true);
       const t0 = performance.now();
-      const scale = scaleFactor;
+
+      // ── UPSCALE AUTOMATIQUE INTELLIGENT ──────────────────────────────────
+      // Si autoUpscale actif : choisit le facteur selon la résolution source
+      let scale = scaleFactor;
+      if (autoUpscale) {
+        const maxDim = Math.max(originalImage.width, originalImage.height);
+        if (maxDim < 1500)      scale = 4; // petite image → 4x
+        else if (maxDim < 3000) scale = 2; // moyenne     → 2x
+        else                    scale = 1; // grande       → pas d'upscale
+      }
+
       const targetW = originalImage.width * scale;
       const targetH = originalImage.height * scale;
 
@@ -186,57 +374,91 @@ export default function DTFStudioPage() {
       tempCanvas.width = targetW;
       tempCanvas.height = targetH;
       const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
+      if (!tempCtx) {
+        throw new Error("Impossible d'obtenir le contexte canvas 2D");
+      }
 
+      // Upscale haute qualité
       tempCtx.imageSmoothingEnabled = scale > 1;
       tempCtx.imageSmoothingQuality = 'high';
       tempCtx.drawImage(originalImage, 0, 0, targetW, targetH);
+
+      // ── FLOU GAUSSIEN POST-UPSCALE (lisse les pixels agrandis) ───────────
+      // Seulement si upscale > 1 (évite de ramollir les images déjà HD)
+      if (scale > 1) {
+        const blurCanvas = document.createElement('canvas');
+        blurCanvas.width = targetW;
+        blurCanvas.height = targetH;
+        const blurCtx = blurCanvas.getContext('2d');
+        if (blurCtx) {
+          // Flou très léger via CSS filter sur canvas — rayon 0.5–1px selon facteur
+          const blurRadius = scale === 4 ? 1 : 0.5;
+          blurCtx.filter = `blur(${blurRadius}px)`;
+          blurCtx.drawImage(tempCanvas, 0, 0);
+          blurCtx.filter = 'none';
+          // Recopie le résultat flou dans tempCanvas
+          tempCtx.clearRect(0, 0, targetW, targetH);
+          tempCtx.drawImage(blurCanvas, 0, 0);
+        }
+      }
 
       const imgData = tempCtx.getImageData(0, 0, targetW, targetH);
       const data = imgData.data;
       const initialOpaque = countOpaque(data);
 
-      let refR = 0,
-        refG = 0,
-        refB = 0;
+      let refR = 0, refG = 0, refB = 0;
+      let skipFloodFill = false;
+      let removedCount = 0;
+
       if (bgRemovalMode === 'auto') {
-        const samples: [number, number, number][] = [];
-        const ss = 4;
-        const corners = [
-          [0, 0],
-          [targetW - ss, 0],
-          [0, targetH - ss],
-          [targetW - ss, targetH - ss],
-        ];
-        for (const [cx, cy] of corners) {
-          for (let dy = 0; dy < ss; dy++) {
-            for (let dx = 0; dx < ss; dx++) {
-              const idx = ((cy + dy) * targetW + (cx + dx)) * 4;
-              samples.push([data[idx], data[idx + 1], data[idx + 2]]);
+        const detection = detectBackgroundColor(imgData);
+        if (detection.detected) {
+          refR = detection.color.r;
+          refG = detection.color.g;
+          refB = detection.color.b;
+          setDetectedBgColor(detection.color); // ← affichage UI
+          const before = countOpaque(data);
+          removeBackgroundByColor(imgData, detection.color, bgTolerance);
+          removedCount += before - countOpaque(data);
+          skipFloodFill = true;
+        } else {
+          setDetectedBgColor(null);
+          const samples: [number, number, number][] = [];
+          const ss = 4;
+          const corners = [
+            [0, 0], [targetW - ss, 0],
+            [0, targetH - ss], [targetW - ss, targetH - ss],
+          ];
+          for (const [cx, cy] of corners) {
+            for (let dy = 0; dy < ss; dy++) {
+              for (let dx = 0; dx < ss; dx++) {
+                const idx = ((cy + dy) * targetW + (cx + dx)) * 4;
+                samples.push([data[idx], data[idx + 1], data[idx + 2]]);
+              }
             }
           }
+          refR = median(samples.map((s) => s[0]));
+          refG = median(samples.map((s) => s[1]));
+          refB = median(samples.map((s) => s[2]));
         }
-        refR = median(samples.map((s) => s[0]));
-        refG = median(samples.map((s) => s[1]));
-        refB = median(samples.map((s) => s[2]));
       } else if (bgRemovalMode === 'picker' || bgRemovalMode === 'custom') {
-        const rgb = hexToRgb(customBgColor);
-        refR = rgb.r;
-        refG = rgb.g;
-        refB = rgb.b;
-      } else if (bgRemovalMode === 'click') {
-        if (clickedBgColor) {
-          refR = clickedBgColor.r;
-          refG = clickedBgColor.g;
-          refB = clickedBgColor.b;
+        setDetectedBgColor(null);
+        if (clickedBgColor && bgRemovalMode === 'picker') {
+          refR = clickedBgColor.r; refG = clickedBgColor.g; refB = clickedBgColor.b;
         } else {
-          refR = data[0];
-          refG = data[1];
-          refB = data[2];
+          const rgb = hexToRgb(customBgColor);
+          refR = rgb.r; refG = rgb.g; refB = rgb.b;
         }
+      } else if (bgRemovalMode === 'click') {
+        setDetectedBgColor(null);
+        if (clickedBgColor) {
+          refR = clickedBgColor.r; refG = clickedBgColor.g; refB = clickedBgColor.b;
+        } else {
+          refR = data[0]; refG = data[1]; refB = data[2];
+        }
+      } else {
+        setDetectedBgColor(null);
       }
-
-      let removedCount = 0;
 
       // =====================================================================
       // STRATÉGIE DOUBLE :
@@ -246,9 +468,8 @@ export default function DTFStudioPage() {
       // =====================================================================
       const effectiveWhiteThreshold = aggressiveWhite ? 220 : whiteThreshold;
 
-      // Étape 1 : Flood-fill pour suppression du NOIR / AUTO / CUSTOM
       const modeForFloodFill: string =
-        bgRemovalMode === 'white' ? 'none' :
+        skipFloodFill || bgRemovalMode === 'white' ? 'none' :
         bgRemovalMode === 'both'  ? 'black' :
         bgRemovalMode;
 
@@ -256,18 +477,20 @@ export default function DTFStudioPage() {
         removedCount += safeBackgroundRemoval(data, targetW, targetH, refR, refG, refB, bgTolerance, modeForFloodFill, whiteTolerance);
       }
 
-      // Étape 2 : Seuil de luminosité GLOBAL pour suppression du BLANC
-      // Formule simple : (R+G+B)/3 > seuil → alpha = 0
-      // Aucun flood-fill, TOUS les pixels clairs deviennent transparents (fond + design)
       if (bgRemovalMode === 'white' || bgRemovalMode === 'both') {
         for (let i = 0; i < data.length; i += 4) {
-          if (data[i + 3] === 0) continue; // déjà transparent
+          if (data[i + 3] === 0) continue;
           const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
           if (avg >= effectiveWhiteThreshold) {
             data[i + 3] = 0;
             removedCount++;
           }
         }
+      }
+
+      // ── SUPPRESSION WATERMARKS ────────────────────────────────────────────
+      if (enableWatermarkRemoval) {
+        detectAndRemoveWatermarks(data, targetW, targetH, watermarkIntensity / 100);
       }
 
       const erodeRadius = erodePixels * scale;
@@ -307,8 +530,7 @@ export default function DTFStudioPage() {
           const outW = Math.max(1, Math.round(finalCanvas.width * ratio));
           const outH = Math.max(1, Math.round(finalCanvas.height * ratio));
           const out = document.createElement('canvas');
-          out.width = outW;
-          out.height = outH;
+          out.width = outW; out.height = outH;
           const o = out.getContext('2d');
           if (o) {
             o.imageSmoothingEnabled = true;
@@ -318,8 +540,7 @@ export default function DTFStudioPage() {
           outputCanvas = out;
         } else {
           const out = document.createElement('canvas');
-          out.width = tW_px;
-          out.height = tH_px;
+          out.width = tW_px; out.height = tH_px;
           const o = out.getContext('2d');
           if (o) {
             o.imageSmoothingEnabled = true;
@@ -347,19 +568,25 @@ export default function DTFStudioPage() {
       const realW = (outputCanvas.width / 300) * 2.54;
       const realH = (outputCanvas.height / 300) * 2.54;
       setDimensionText(`📐 ${realW.toFixed(1)}×${realH.toFixed(1)}cm · ${outputCanvas.width}×${outputCanvas.height}px`);
-      setPerfText(`⚡ ${(performance.now() - t0).toFixed(0)}ms`);
+      setPerfText(`⚡ ${(performance.now() - t0).toFixed(0)}ms · ${scale}x`);
 
       if (bgRemovalMode !== 'none') {
         setDebugText(`Fond rgb(${refR.toFixed(0)},${refG.toFixed(0)},${refB.toFixed(0)}) · Suppr: ${removedCount.toLocaleString()}/${initialOpaque.toLocaleString()}`);
       } else {
         setDebugText('');
       }
-
-      setIsProcessing(false);
+      } catch (error) {
+        console.error('Erreur traitement:', error);
+        showToast('Erreur lors du traitement', 'error');
+      } finally {
+        setIsProcessing(false);
+      }
     }, 50);
   }, [
     originalImage,
+    showToast,
     scaleFactor,
+    autoUpscale,
     bgRemovalMode,
     customBgColor,
     clickedBgColor,
@@ -367,6 +594,8 @@ export default function DTFStudioPage() {
     whiteTolerance,
     whiteThreshold,
     aggressiveWhite,
+    enableWatermarkRemoval,
+    watermarkIntensity,
     erodePixels,
     enableFillHoles,
     fillHolesSize,
@@ -396,6 +625,7 @@ export default function DTFStudioPage() {
     }
   }, [processImage, originalImage, awaitingClickColor]);
 
+
   // Handle image upload
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -416,13 +646,16 @@ export default function DTFStudioPage() {
 
   // Canvas Click Pipette
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (bgRemovalMode !== 'click' || !originalImage || !awaitingClickColor || !canvasRef.current) return;
+    const pickerActive = bgRemovalMode === 'click' || bgRemovalMode === 'picker';
+    if (!pickerActive || !originalImage || !awaitingClickColor || !canvasRef.current) return;
     const canvasEl = canvasRef.current;
     const rect = canvasEl.getBoundingClientRect();
     const sx = canvasEl.width / rect.width;
     const sy = canvasEl.height / rect.height;
-    const x = Math.min(canvasEl.width - 1, Math.max(0, Math.floor((e.clientX - rect.left) * sx)));
-    const y = Math.min(canvasEl.width - 1, Math.max(0, Math.floor((e.clientY - rect.top) * sy)));
+    const rectX = (e.clientX - rect.left) * sx;
+    const rectY = (e.clientY - rect.top) * sy;
+    const x = Math.min(Math.max(0, Math.floor(rectX)), canvasEl.width - 1);
+    const y = Math.min(Math.max(0, Math.floor(rectY)), canvasEl.height - 1);
     const ctx = canvasEl.getContext('2d');
     if (!ctx) return;
     const p = ctx.getImageData(x, y, 1, 1).data;
@@ -431,6 +664,12 @@ export default function DTFStudioPage() {
       return;
     }
     setClickedBgColor({ r: p[0], g: p[1], b: p[2] });
+    const hex =
+      '#' +
+      [p[0], p[1], p[2]]
+        .map((v) => v.toString(16).padStart(2, '0'))
+        .join('');
+    setCustomBgColor(hex);
     setAwaitingClickColor(false);
     showToast(`🎯 rgb(${p[0]},${p[1]},${p[2]})`, 'success');
   };
@@ -828,7 +1067,7 @@ export default function DTFStudioPage() {
                 ref={canvasRef}
                 onClick={handleCanvasClick}
                 className={`max-h-[500px] max-w-full object-contain ${
-                  bgRemovalMode === 'click' && awaitingClickColor ? 'cursor-crosshair border-2 border-dashed border-[#F7941D]' : ''
+                  (bgRemovalMode === 'click' || bgRemovalMode === 'picker') && awaitingClickColor ? 'cursor-crosshair border-2 border-dashed border-[#F7941D]' : ''
                 }`}
               />
             )}
@@ -870,24 +1109,54 @@ export default function DTFStudioPage() {
             <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
               {t('studioPage.upscaleSection')}
             </h3>
-            <div className="flex items-center gap-1.5">
-              {([1, 2, 4] as const).map((factor) => (
-                <button
-                  key={factor}
-                  onClick={() => setScaleFactor(factor)}
-                  className={`flex-1 py-1.5 rounded text-xs font-extrabold border transition-all ${
-                    scaleFactor === factor
-                      ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-md shadow-[#F7941D]/20'
-                      : 'bg-[#0A0A0A] text-slate-300 border-[#2E2E2E] hover:border-[#F7941D]'
-                  }`}
-                >
-                  {factor === 1 ? t('studioPage.upscale1x') : factor === 2 ? t('studioPage.upscale2x') : t('studioPage.upscale4x')}
-                </button>
-              ))}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1.5">
-              Résolution sortie : {scaleFactor === 1 ? 'Originale' : scaleFactor === 2 ? '2× (recommandé)' : '4× Ultra-HD (lent)'}
-            </p>
+
+            {/* Toggle Upscale Auto */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs mb-2">
+              <input
+                type="checkbox"
+                checked={autoUpscale}
+                onChange={(e) => setAutoUpscale(e.target.checked)}
+                className="accent-[#F7941D] w-3.5 h-3.5"
+              />
+              <span className="text-[11px] text-slate-300 font-bold">⚡ Upscale automatique (recommandé)</span>
+            </label>
+
+            {autoUpscale ? (
+              <p className="text-[10px] text-slate-500 bg-[#0A0A0A] rounded px-2 py-1.5 leading-snug">
+                🔍 Auto : &lt;1500px→4x · 1500–3000px→2x · &gt;3000px→1x<br />
+                {originalImage && (
+                  <span className="text-[#F7941D] font-bold">
+                    {Math.max(originalImage.width, originalImage.height) < 1500
+                      ? '→ 4x Ultra-HD appliqué'
+                      : Math.max(originalImage.width, originalImage.height) < 3000
+                      ? '→ 2x recommandé appliqué'
+                      : '→ Pas d\'upscale (image déjà HD)'}
+                  </span>
+                )}
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  {([1, 2, 4] as const).map((factor) => (
+                    <button
+                      key={factor}
+                      onClick={() => setScaleFactor(factor)}
+                      className={`flex-1 py-1.5 rounded text-xs font-extrabold border transition-all ${
+                        scaleFactor === factor
+                          ? 'bg-[#F7941D] text-black border-[#F7941D] shadow-md shadow-[#F7941D]/20'
+                          : 'bg-[#0A0A0A] text-slate-300 border-[#2E2E2E] hover:border-[#F7941D]'
+                      }`}
+                    >
+                      {factor === 1 ? t('studioPage.upscale1x') : factor === 2 ? t('studioPage.upscale2x') : t('studioPage.upscale4x')}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1.5">
+                  Résolution sortie : {scaleFactor === 1 ? 'Originale' : scaleFactor === 2 ? '2× (recommandé)' : '4× Ultra-HD (lent)'}
+                </p>
+              </>
+            )}
+            <p className="text-[9px] text-slate-600 mt-1">Flou gaussien léger appliqué après upscale pour lisser les pixels.</p>
           </div>
 
           {/* ====== SUPPRESSION DU FOND ====== */}
@@ -902,7 +1171,7 @@ export default function DTFStudioPage() {
                 onChange={(e) => {
                   const m = e.target.value as 'auto' | 'black' | 'white' | 'both' | 'custom' | 'picker' | 'click' | 'none';
                   setBgRemovalMode(m);
-                  if (m === 'click' || m === 'custom') setAwaitingClickColor(true);
+                  if (m === 'click' || m === 'custom' || m === 'picker') setAwaitingClickColor(true);
                   else setAwaitingClickColor(false);
                 }}
                 className="bg-[#0A0A0A] border border-[#2E2E2E] text-white rounded px-2 py-1 flex-1 text-xs"
@@ -912,6 +1181,7 @@ export default function DTFStudioPage() {
                 <option value="white">{t('studio.bgRemoval.mode.white')}</option>
                 <option value="both">{t('studio.bgRemoval.mode.both')}</option>
                 <option value="custom">{t('studio.bgRemoval.mode.custom')}</option>
+                <option value="picker">🎨 Pipette (choisir la couleur)</option>
                 <option value="none">{t('studio.bgRemoval.mode.none')}</option>
               </select>
             </div>
@@ -988,7 +1258,61 @@ export default function DTFStudioPage() {
               </div>
             )}
 
+            {/* Couleur de fond détectée */}
+            {detectedBgColor && bgRemovalMode === 'auto' && (
+              <div className="flex items-center gap-2 mt-1.5 text-[10px]">
+                <div
+                  className="w-4 h-4 rounded border border-[#2E2E2E] flex-shrink-0"
+                  style={{ backgroundColor: `rgb(${detectedBgColor.r},${detectedBgColor.g},${detectedBgColor.b})` }}
+                />
+                <span className="text-slate-400">
+                  🎯 Couleur détectée : <span className="text-[#F7941D] font-bold font-mono">
+                    rgb({detectedBgColor.r},{detectedBgColor.g},{detectedBgColor.b})
+                  </span>
+                </span>
+              </div>
+            )}
             {debugText && <div className="text-[10px] text-[#FFB25A] mt-1">📊 {debugText}</div>}
+          </div>
+
+          {/* ====== SUPPRESSION WATERMARKS ====== */}
+          <div className="bg-[#161616] border border-[#2E2E2E] rounded-lg p-2.5">
+            <h3 className="text-[11px] font-extrabold text-[#F7941D] uppercase border-b border-[#2E2E2E] pb-1 mb-2">
+              🔍 Suppression Watermarks
+            </h3>
+
+            {/* Toggle Watermark Removal */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs mb-2">
+              <input
+                type="checkbox"
+                checked={enableWatermarkRemoval}
+                onChange={(e) => setEnableWatermarkRemoval(e.target.checked)}
+                className="accent-[#F7941D] w-3.5 h-3.5"
+              />
+              <span className="text-[11px] text-slate-300 font-bold">Supprimer watermarks auto</span>
+            </label>
+
+            {enableWatermarkRemoval && (
+              <>
+                <div className="flex items-center gap-2 text-xs">
+                  <label className="w-20 text-[#9C9C9C] text-[11px]">Intensité</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={watermarkIntensity}
+                    onChange={(e) => setWatermarkIntensity(parseInt(e.target.value))}
+                    className="flex-1 accent-[#F7941D]"
+                  />
+                  <span className="w-8 text-right text-[#F7941D] font-bold text-[11px]">{watermarkIntensity}</span>
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1 leading-snug">
+                  Détecte les zones semi-transparentes, textes et logos overlay,
+                  puis les remplace par le fond environnant (inpainting).
+                  <span className="text-amber-400"> ⚠️ Peut altérer certains designs. Tester avec précaution.</span>
+                </p>
+              </>
+            )}
           </div>
 
 
