@@ -1,13 +1,15 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
-import { useTranslation } from '@/hooks/useTranslation';
+import { getDictionary } from '@/lib/i18n/dictionary';
 
-export default function CGUPage() {
-  const { t } = useTranslation();
+interface PageProps {
+  params?: Promise<{ lang?: string }> | { lang?: string };
+}
+
+export default async function CGUPage(props: PageProps) {
+  const resolvedParams = props?.params ? await Promise.resolve(props.params) : {};
+  const dict = await getDictionary(resolvedParams?.lang);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-slate-200 font-sans selection:bg-[#F7941D] selection:text-black">
@@ -17,52 +19,63 @@ export default function CGUPage() {
           <span className="text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
         </Link>
         <div className="flex items-center gap-4">
-          <LanguageCurrencySelector />
           <Link href="/" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> {t('common.home')}
+            <ArrowLeft className="w-4 h-4" /> {dict.common?.home || 'Accueil'}
           </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-16 space-y-8">
         <div className="border-b border-[#2E2E2E] pb-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">{t('legal.cguTitle')}</h1>
-          <p className="text-xs text-slate-400">{t('legal.lastUpdate')} {new Date().toLocaleDateString()}</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">
+            {dict.legal?.cgu?.title || dict.legal?.cguTitle}
+          </h1>
+          <p className="text-xs text-slate-400">
+            {dict.legal?.cgu?.lastUpdate || dict.legal?.lastUpdate} : 04/09/2026
+          </p>
         </div>
 
         <section className="space-y-6 text-xs leading-relaxed text-slate-300">
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">1. Objet et Présentation de la Plateforme</h2>
-            <p>
-              VXEL DTF Studio Pro propose une solution SaaS B2B dédiée à l'optimisation, au détourage et à la préparation de fichiers d'impression Direct-to-Film (DTF). Les présentes CGU régissent l'accès et l'utilisation de l'ensemble des services disponibles sur le domaine vxelbeta-teal.vercel.app.
-            </p>
-          </div>
+          {dict.legal?.cgu?.sections?.objet && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.cgu.sections.objet.title}
+              </h2>
+              <p>{dict.legal.cgu.sections.objet.content}</p>
+            </div>
+          )}
 
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">2. Accès aux Services et Crédits</h2>
-            <p>
-              L'accès aux fonctionnalités d'exportation nécessite un compte utilisateur valide et l'utilisation de crédits. Chaque utilisateur se voit attribuer 10 crédits d'essai à l'inscription. Des crédits supplémentaires peuvent être achetés via des abonnements mensuels ou des packs rechargeables valables 30 jours après achat.
-            </p>
-          </div>
+          {dict.legal?.cgu?.sections?.credits && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.cgu.sections.credits.title}
+              </h2>
+              <p>{dict.legal.cgu.sections.credits.content}</p>
+            </div>
+          )}
 
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">3. Propriété Intellectuelle et Fichiers Client</h2>
-            <p>
-              L'utilisateur conserve l'entière propriété intellectuelle des fichiers image importés. VXEL s'engage à ne pas diffuser, revendre ou utiliser les visuels clients à d'autres fins que le traitement technique commandé par l'utilisateur.
-            </p>
-          </div>
+          {dict.legal?.cgu?.sections?.propriete && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.cgu.sections.propriete.title}
+              </h2>
+              <p>{dict.legal.cgu.sections.propriete.content}</p>
+            </div>
+          )}
 
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">4. Responsabilité et Disponibilité</h2>
-            <p>
-              VXEL met en œuvre tous les moyens raisonnables pour assurer une disponibilité de 99.9% des serveurs. VXEL ne saurait être tenu responsable d'éventuels défauts d'impression dus à un fichier source de qualité insuffisante fourni par l'utilisateur.
-            </p>
-          </div>
+          {dict.legal?.cgu?.sections?.responsabilite && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.cgu.sections.responsabilite.title}
+              </h2>
+              <p>{dict.legal.cgu.sections.responsabilite.content}</p>
+            </div>
+          )}
         </section>
       </main>
 
       <footer className="max-w-7xl mx-auto text-center py-8 border-t border-[#2E2E2E] text-xs text-slate-600">
-        © {new Date().getFullYear()} VXEL DTF Studio Pro. {t('footer.rights')}
+        © {new Date().getFullYear()} VXEL DTF Studio Pro. {dict.footer?.rights}
       </footer>
     </div>
   );

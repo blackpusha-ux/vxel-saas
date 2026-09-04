@@ -26,6 +26,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('vexel_lang', newLang);
       localStorage.setItem('vxel_lang', newLang);
+      document.cookie = `vexel_lang=${newLang}; path=/; max-age=31536000; SameSite=Lax`;
+      document.cookie = `vxel_lang=${newLang}; path=/; max-age=31536000; SameSite=Lax`;
       window.dispatchEvent(new Event('vxel-language-changed'));
     }
   }, []);

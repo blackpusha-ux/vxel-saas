@@ -1,13 +1,15 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import LanguageCurrencySelector from '@/components/LanguageCurrencySelector';
-import { useTranslation } from '@/hooks/useTranslation';
+import { getDictionary } from '@/lib/i18n/dictionary';
 
-export default function MentionsLegalesPage() {
-  const { t } = useTranslation();
+interface PageProps {
+  params?: Promise<{ lang?: string }> | { lang?: string };
+}
+
+export default async function MentionsLegalesPage(props: PageProps) {
+  const resolvedParams = props?.params ? await Promise.resolve(props.params) : {};
+  const dict = await getDictionary(resolvedParams?.lang);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-slate-200 font-sans selection:bg-[#F7941D] selection:text-black">
@@ -17,47 +19,54 @@ export default function MentionsLegalesPage() {
           <span className="text-white">VXEL <span className="text-[#F7941D]">DTF Pro</span></span>
         </Link>
         <div className="flex items-center gap-4">
-          <LanguageCurrencySelector />
           <Link href="/" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> {t('common.home')}
+            <ArrowLeft className="w-4 h-4" /> {dict.common?.home || 'Accueil'}
           </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-16 space-y-8">
         <div className="border-b border-[#2E2E2E] pb-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">{t('legal.mentionsTitle')}</h1>
-          <p className="text-xs text-slate-400">{t('legal.lastUpdate')} {new Date().toLocaleDateString()}</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">
+            {dict.legal?.legalNotice?.title || dict.legal?.mentionsTitle}
+          </h1>
+          <p className="text-xs text-slate-400">
+            {dict.legal?.legalNotice?.lastUpdate || dict.legal?.lastUpdate} : 04/09/2026
+          </p>
         </div>
 
         <section className="space-y-6 text-xs leading-relaxed text-slate-300">
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">1. Éditeur de la Plateforme</h2>
-            <p>
-              Le site <strong>VXEL DTF Studio Pro</strong> est édité par la société VXEL Inc., spécialisée dans les solutions logicielles d'optimisation d'impression textile B2B.
-              <br />
-              <strong>Email de contact :</strong> contact@vexel.com / contact.tbalbiza@gmail.com
-            </p>
-          </div>
+          {dict.legal?.legalNotice?.sections?.editeur && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.legalNotice.sections.editeur.title}
+              </h2>
+              <p>{dict.legal.legalNotice.sections.editeur.content}</p>
+            </div>
+          )}
 
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">2. Hébergement Web</h2>
-            <p>
-              La plateforme est hébergée sur l'infrastructure cloud sécurisée de Vercel Inc. (Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis).
-            </p>
-          </div>
+          {dict.legal?.legalNotice?.sections?.hebergeur && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.legalNotice.sections.hebergeur.title}
+              </h2>
+              <p>{dict.legal.legalNotice.sections.hebergeur.content}</p>
+            </div>
+          )}
 
-          <div>
-            <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">3. Authentification & Base de Données</h2>
-            <p>
-              Le système d'authentification sécurisé est fourni par Clerk Inc. Les données d'utilisateurs et de crédits sont stockées sur MongoDB Atlas avec chiffrement des données au repos et en transit.
-            </p>
-          </div>
+          {dict.legal?.legalNotice?.sections?.securite && (
+            <div>
+              <h2 className="text-base font-bold text-white mb-2 text-[#F7941D]">
+                {dict.legal.legalNotice.sections.securite.title}
+              </h2>
+              <p>{dict.legal.legalNotice.sections.securite.content}</p>
+            </div>
+          )}
         </section>
       </main>
 
       <footer className="max-w-7xl mx-auto text-center py-8 border-t border-[#2E2E2E] text-xs text-slate-600">
-        © {new Date().getFullYear()} VXEL DTF Studio Pro. {t('footer.rights')}
+        © {new Date().getFullYear()} VXEL DTF Studio Pro. {dict.footer?.rights}
       </footer>
     </div>
   );

@@ -417,6 +417,70 @@ export const dictionary: Record<Language, Record<string, any>> = {
       noProjectTitle: 'Aucun projet trouvé.',
       noProjectCta: 'Créer mon premier projet',
     },
+    legal: {
+      cguTitle: "Conditions Générales d'Utilisation",
+      privacyTitle: 'Politique de Confidentialité',
+      mentionsTitle: 'Mentions Légales',
+      lastUpdate: 'Dernière mise à jour',
+      cgu: {
+        title: "Conditions Générales d'Utilisation",
+        lastUpdate: 'Dernière mise à jour',
+        sections: {
+          objet: {
+            title: "1. Objet et Présentation de la Plateforme",
+            content: "VXEL DTF Studio Pro propose une solution SaaS B2B dédiée à l'optimisation, au détourage et à la préparation de fichiers d'impression Direct-to-Film (DTF). Les présentes CGU régissent l'accès et l'utilisation de l'ensemble des services disponibles."
+          },
+          credits: {
+            title: "2. Accès aux Services et Crédits",
+            content: "L'accès aux fonctionnalités d'exportation nécessite un compte utilisateur valide et l'utilisation de crédits. Chaque utilisateur se voit attribuer 10 crédits d'essai à l'inscription."
+          },
+          propriete: {
+            title: "3. Propriété Intellectuelle et Fichiers",
+            content: "L'utilisateur conserve l'entière propriété intellectuelle des fichiers image importés. VXEL s'engage à ne pas diffuser, reproduire ou utiliser les fichiers uploadés à des fins commerciales sans autorisation explicite."
+          },
+          responsabilite: {
+            title: "4. Responsabilité et Disponibilité",
+            content: "VXEL met en œuvre tous les moyens raisonnables pour assurer une disponibilité optimale des serveurs. VXEL ne saurait être tenu responsable d'éventuels défauts d'impression dus à un fichier source de qualité insuffisante fourni par l'utilisateur."
+          }
+        }
+      },
+      privacy: {
+        title: "Politique de Confidentialité",
+        lastUpdate: 'Dernière mise à jour',
+        sections: {
+          donnees: {
+            title: "1. Données Collectées",
+            content: "VXEL traite uniquement les données strictement nécessaires à la fourniture de nos services : votre adresse e-mail (gérée via Clerk pour l'authentification), vos informations de compte, le solde de crédits et l'historique anonymisé de vos projets d'impression."
+          },
+          traitement: {
+            title: "2. Traitement et Hébergement des Fichiers",
+            content: "Les images que vous téléchargez sur VXEL DTF Studio Pro sont traitées temporairement en mémoire vive sur nos serveurs sécurisés. Aucune image n'est conservée au-delà de la durée nécessaire au traitement et à l'exportation par l'utilisateur."
+          },
+          droits: {
+            title: "3. Vos Droits (RGPD)",
+            content: "Conformément à la réglementation européenne sur la protection des données (RGPD), vous disposez d'un droit d'accès, de rectification et de suppression de vos données personnelles. Vous pouvez exercer ce droit à tout moment en contactant contact@vexel.com."
+          }
+        }
+      },
+      legalNotice: {
+        title: "Mentions Légales",
+        lastUpdate: 'Dernière mise à jour',
+        sections: {
+          editeur: {
+            title: "1. Éditeur de la Plateforme",
+            content: "Le site VXEL DTF Studio Pro est édité par la société VXEL Inc., spécialisée dans les solutions logicielles d'optimisation d'impression textile B2B. Email : contact@vexel.com / contact.tbalbiza@gmail.com"
+          },
+          hebergeur: {
+            title: "2. Hébergement Web",
+            content: "La plateforme est hébergée sur l'infrastructure cloud sécurisée de Vercel Inc. (Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis)."
+          },
+          securite: {
+            title: "3. Authentification & Base de Données",
+            content: "Le système d'authentification sécurisé est fourni par Clerk Inc. Les données d'utilisateurs et de crédits sont stockées sur MongoDB Atlas avec chiffrement des données au repos et en transit."
+          }
+        }
+      }
+    },
   },
 
   en: {
@@ -834,6 +898,70 @@ export const dictionary: Record<Language, Record<string, any>> = {
       statusReady: 'Ready to Print',
       noProjectTitle: 'No projects found.',
       noProjectCta: 'Create my first project',
+    },
+    legal: {
+      cguTitle: 'Terms of Service',
+      privacyTitle: 'Privacy Policy',
+      mentionsTitle: 'Legal Notice',
+      lastUpdate: 'Last updated',
+      cgu: {
+        title: 'Terms of Service',
+        lastUpdate: 'Last updated',
+        sections: {
+          objet: {
+            title: '1. Purpose and Platform Overview',
+            content: 'VXEL DTF Studio Pro provides a B2B SaaS solution dedicated to Direct-to-Film (DTF) print file preparation, background removal, and optimization. These Terms govern access to and use of all available services.'
+          },
+          credits: {
+            title: '2. Access to Services and Credits',
+            content: 'Access to export features requires a valid user account and credits. Each user is granted 10 free trial credits upon registration.'
+          },
+          propriete: {
+            title: '3. Intellectual Property and Files',
+            content: 'The user retains full intellectual property rights over all uploaded artwork. VXEL agrees not to distribute, reproduce, or use uploaded files for commercial purposes without explicit authorization.'
+          },
+          responsabilite: {
+            title: '4. Liability and Availability',
+            content: 'VXEL implements all reasonable means to ensure optimal server uptime. VXEL shall not be held liable for print defects resulting from insufficient quality of the source artwork provided by the user.'
+          }
+        }
+      },
+      privacy: {
+        title: 'Privacy Policy',
+        lastUpdate: 'Last updated',
+        sections: {
+          donnees: {
+            title: '1. Collected Data',
+            content: 'VXEL only collects data strictly necessary to provide our services: your email address (managed via Clerk for authentication), account info, credit balance, and anonymized print history.'
+          },
+          traitement: {
+            title: '2. File Processing and Hosting',
+            content: 'Images uploaded to VXEL DTF Studio Pro are processed temporarily in server memory. No image is retained beyond the time necessary for user processing and export.'
+          },
+          droits: {
+            title: '3. Your Rights (GDPR)',
+            content: 'In accordance with European data protection regulations (GDPR), you have the right to access, rectify, and delete your personal data at any time by contacting contact@vexel.com.'
+          }
+        }
+      },
+      legalNotice: {
+        title: 'Legal Notice',
+        lastUpdate: 'Last updated',
+        sections: {
+          editeur: {
+            title: '1. Platform Publisher',
+            content: 'The VXEL DTF Studio Pro website is published by VXEL Inc., specializing in B2B textile printing software. Email: contact@vexel.com / contact.tbalbiza@gmail.com'
+          },
+          hebergeur: {
+            title: '2. Web Hosting',
+            content: 'The platform is hosted on the secure cloud infrastructure of Vercel Inc. (Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, USA).'
+          },
+          securite: {
+            title: '3. Authentication & Database',
+            content: 'The secure authentication system is provided by Clerk Inc. User data and credits are stored on MongoDB Atlas with encryption at rest and in transit.'
+          }
+        }
+      }
     },
   },
 
@@ -1253,6 +1381,70 @@ export const dictionary: Record<Language, Record<string, any>> = {
       noProjectTitle: 'No se encontraron proyectos.',
       noProjectCta: 'Crear mi primer proyecto',
     },
+    legal: {
+      cguTitle: 'Términos y Condiciones de Uso',
+      privacyTitle: 'Política de Privacidad',
+      mentionsTitle: 'Aviso Legal',
+      lastUpdate: 'Última actualización',
+      cgu: {
+        title: 'Términos y Condiciones de Uso',
+        lastUpdate: 'Última actualización',
+        sections: {
+          objet: {
+            title: '1. Objeto y Presentación de la Plataforma',
+            content: 'VXEL DTF Studio Pro ofrece una solución SaaS B2B dedicada a la optimización, recorte y preparación de archivos de impresión Direct-to-Film (DTF). Estos Términos regulan el acceso y uso de todos los servicios disponibles.'
+          },
+          credits: {
+            title: '2. Acceso a los Servicios y Créditos',
+            content: 'El acceso a las funciones de exportación requiere una cuenta de usuario válida y el uso de créditos. Cada usuario recibe 10 créditos de prueba al registrarse.'
+          },
+          propriete: {
+            title: '3. Propiedad Intelectual y Archivos',
+            content: 'El usuario conserva la propiedad intelectual total de los archivos de imagen cargados. VXEL se compromete a no distribuir, reproducir ni utilizar los archivos subidos con fines comerciales sin autorización explícita.'
+          },
+          responsabilite: {
+            title: '4. Responsabilidad y Disponibilidad',
+            content: 'VXEL implementa todos los medios razonables para garantizar una disponibilidad óptima del servidor. VXEL no se hace responsable de defectos de impresión derivados de calidad insuficiente en la imagen de origen.'
+          }
+        }
+      },
+      privacy: {
+        title: 'Política de Privacidad',
+        lastUpdate: 'Última actualización',
+        sections: {
+          donnees: {
+            title: '1. Datos Recopilados',
+            content: 'VXEL solo procesa los datos estrictamente necesarios para prestar nuestros servicios: su correo electrónico (gestionado mediante Clerk), información de cuenta, saldo de créditos e historial anónimo de proyectos de impresión.'
+          },
+          traitement: {
+            title: '2. Procesamiento y Alojamiento de Archivos',
+            content: 'Las imágenes cargadas en VXEL DTF Studio Pro se procesan temporalmente en memoria en nuestros servidores seguros. Ninguna imagen se conserva más allá del tiempo necesario para el procesamiento y exportación.'
+          },
+          droits: {
+            title: '3. Sus Derechos (RGPD)',
+            content: 'Conforme al Reglamento General de Protección de Datos (RGPD), usted tiene derecho a acceder, rectificar y suprimir sus datos personales en cualquier momento contactando con contact@vexel.com.'
+          }
+        }
+      },
+      legalNotice: {
+        title: 'Aviso Legal',
+        lastUpdate: 'Última actualización',
+        sections: {
+          editeur: {
+            title: '1. Editor de la Plataforma',
+            content: 'El sitio web VXEL DTF Studio Pro es editado por VXEL Inc., especializada en soluciones de software de optimización para impresión textil B2B. Email: contact@vexel.com / contact.tbalbiza@gmail.com'
+          },
+          hebergeur: {
+            title: '2. Alojamiento Web',
+            content: 'La plataforma está alojada en la infraestructura en la nube de Vercel Inc. (Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, Estados Unidos).'
+          },
+          securite: {
+            title: '3. Autenticación y Base de Datos',
+            content: 'El sistema de autenticación seguro es proporcionado por Clerk Inc. Los datos de usuarios y créditos se almacenan en MongoDB Atlas con cifrado en reposo y en tránsito.'
+          }
+        }
+      }
+    },
   },
 };
 
@@ -1268,3 +1460,23 @@ export function translatePath(dict: Record<string, any>, path: string): string {
   }
   return typeof current === 'string' ? current : path;
 }
+
+export async function getDictionary(lang?: string): Promise<Record<string, any>> {
+  let selectedLang: Language = 'fr';
+  if (lang && ['fr', 'en', 'es'].includes(lang)) {
+    selectedLang = lang as Language;
+  } else {
+    try {
+      const { cookies } = await import('next/headers');
+      const cookieStore = await cookies();
+      const cookieLang = cookieStore.get('vexel_lang')?.value || cookieStore.get('vxel_lang')?.value;
+      if (cookieLang && ['fr', 'en', 'es'].includes(cookieLang)) {
+        selectedLang = cookieLang as Language;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return dictionary[selectedLang] || dictionary.fr;
+}
+
