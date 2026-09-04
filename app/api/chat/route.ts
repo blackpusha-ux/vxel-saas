@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log('Clé API présente:', !!process.env.GROQ_API_KEY);
+
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -21,7 +23,6 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-
 
     // Préparer les messages avec le system prompt en tête
     const groqMessages = [
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama3-70b-8192',
+        model: 'groq/compound',
         messages: groqMessages,
         temperature: 0.7,
         max_tokens: 500,
@@ -47,8 +48,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Erreur API Groq:', errorData);
+      const rawErrorText = await response.text();
+      console.error('ERREUR GROQ:', rawErrorText);
       return NextResponse.json(
         { error: 'Erreur lors de la communication avec l\'assistant IA.' },
         { status: response.status }
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ reply });
   } catch (error: any) {
-    console.error('Erreur Route API Chat:', error);
+    console.error('ERREUR CHATBOT:', error);
     return NextResponse.json(
       { error: error?.message || 'Erreur interne du serveur.' },
       { status: 500 }
